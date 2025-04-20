@@ -1,26 +1,24 @@
-name: Update Daily Key
+name: Update Key File Every 5 Minutes
 
 on:
   schedule:
-    - cron: "0 0 * * *"  # Runs daily at 00:00 UTC
+    - cron: '*/5 * * * *'  # Runs every 5 minutes
 
 jobs:
-  update-key:
+  update_key:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Generate new key
-      run: |
-        NEW_KEY=$(openssl rand -hex 8)
-        echo "$NEW_KEY" > key.txt
+      - name: Update Key.txt
+        run: |
+          echo "NewKeyHere" > Key.txt  # Replace with your actual key logic or generate one
 
-    - name: Commit and push changes
-      run: |
-        git config --global user.name "github-actions"
-        git config --global user.email "github-actions@github.com"
-        git add key.txt
-        git commit -m "Daily key update"
-        git push
+      - name: Commit and push updated Key.txt
+        uses: EndBug/add-and-commit@v7
+        with:
+          author_name: "GitHub Actions"
+          author_email: "actions@github.com"
+          message: "Update Key.txt every 5 minutes"
