@@ -1,0 +1,3329 @@
+local Luna = loadstring(game:HttpGet("https://pastefy.app/xp16RyQX/raw", true))()
+
+local Window = Luna:CreateWindow({
+    Name = "H4x Hub - Steal a Brainrot", -- This Is Title Of Your Window
+    Subtitle = nil, -- A Gray Subtitle next To the main title.
+    LogoID = "6034509993", -- The Asset ID of your logo. Set to nil if you do not have a logo for Luna to use.
+    LoadingEnabled = true, -- Whether to enable the loading animation. Set to false if you do not want the loading screen or have your own custom one.
+    LoadingTitle = "Steal a Brainrot Script", -- Header for loading screen
+    LoadingSubtitle = "by H4x", -- Subtitle for loading screen
+
+    ConfigSettings = {
+        RootFolder = nil, -- The Root Folder Is Only If You Have A Hub With Multiple Game Scripts and u may remove it. DO NOT ADD A SLASH
+        ConfigFolder = "H4x Hub" -- The Name Of The Folder Where Luna Will Store Configs For This Script. DO NOT ADD A SLASH
+    },
+
+    KeySystem = false, -- As Of Beta 6, Luna Has officially Implemented A Key System!
+    KeySettings = {
+        Title = "Luna Example Key",
+        Subtitle = "Key System",
+        Note = "Best Key System Ever! Also, Please Use A HWID Keysystem like Pelican, Luarmor etc. that provide key strings based on your HWID since putting a simple string is very easy to bypass",
+        SaveInRoot = false, -- Enabling will save the key in your RootFolder (YOU MUST HAVE ONE BEFORE ENABLING THIS OPTION)
+        SaveKey = true, -- The user's key will be saved, but if you change the key, they will be unable to use your script
+        Key = {"Example Key"}, -- List of keys that will be accepted by the system, please use a system like Pelican or Luarmor that provide key strings based on your HWID since putting a simple string is very easy to bypass
+        SecondAction = {
+            Enabled = true, -- Set to false if you do not want a second action,
+            Type = "Link", -- Link / Discord.
+            Parameter = "" -- If Type is Discord, then put your invite link (DO NOT PUT DISCORD.GG/). Else, put the full link of your key system here.
+        }
+    }
+})
+
+
+-- ðŸ“Œ Services & Module
+local plrs = game:GetService("Players")
+local rs = game:GetService("ReplicatedStorage")
+local plr = plrs.LocalPlayer
+
+local plotController = require(rs.Controllers.PlotController)
+local Animals = require(rs.Datas.Animals)
+local sharedAnimals = require(rs.Shared.Animals)
+
+-- ðŸ“Œ Hilfsfunktionen
+local function splitConcatenatedTable(str, sep)
+local result = {}
+for part in string.gmatch(str, "([^" .. sep .. "]+)") do
+table.insert(result, part)
+end
+return result
+end
+
+-- Pareto-Filter: beste Tiere anhand bestimmter Keys finden
+local function getBestByKeys(pets, keys)
+local bestPets = {}
+for _, pet in ipairs(pets) do
+local dominated = false
+for _, other in ipairs(pets) do
+if other ~= pet then
+local betterInAtLeastOne = false
+local worseInAny = false
+for _, key in ipairs(keys) do
+local a, b = pet[key] or -math.huge, other[key] or -math.huge
+if b > a then
+worseInAny = true
+elseif b < a then
+betterInAtLeastOne = true
+end
+end
+if worseInAny and not betterInAtLeastOne then
+dominated = true
+break
+end
+end
+end
+if not dominated then
+table.insert(bestPets, pet)
+end
+end
+return bestPets
+end
+
+-- ðŸ“Œ SAB Basis
+local SAB = {}
+
+function SAB.GetPlots()
+if not _plots then
+getgenv()._plots = getupvalue(plotController.Start, 2)
+end
+return _plots
+end
+
+function SAB.GetPlot(UID)
+return (UID and SAB.GetPlots()[UID]) or plotController:GetMyPlot()
+end
+
+function SAB.GetPlotAnimals(plot)
+plot = plot or SAB.GetPlot()
+local _, b = plot.Channel:Get("AnimalList")
+return b.AnimalList
+end
+
+function SAB.GetAnimalPrice(animalName)
+return sharedAnimals:GetPrice(animalName)
+end
+
+function SAB.GetAnimalGeneration(animalName, mutation, traits)
+return sharedAnimals:GetGeneration(animalName, mutation, traits, nil)
+end
+
+-- ðŸ“Œ Highlight Modes
+local HighlightModeEnum = {
+Price = 1,
+Generation = 2,
+Both = 3
+}
+
+-- =========================================================
+-- ðŸŸ¢ Highlight Best Plot Animals
+-- =========================================================
+SAB.HighlightBestPlotAnimals = {
+lastHighlights = {},
+lastGuis = {},
+CHECK_DELAY = 0.25,
+highlightMode = HighlightModeEnum.Both,
+highlightEveryBase = true,
+excludeOwnBase = true
+}
+
+function SAB.HighlightBestPlotAnimals:GetBestAnimalGuisGlobal()
+local matchingGuis, animals = {}, {}
+for _, plot in pairs(SAB.GetPlots()) do
+if not (self.excludeOwnBase and plot.UID == SAB.GetPlot().UID) then
+local plotAnimals = SAB.GetPlotAnimals(plot)
+if plotAnimals then
+for podiumIndex, animal in pairs(plotAnimals) do
+if animal ~= "Empty" and animal.Steal == false then
+local price = SAB.GetAnimalPrice(animal.Index)
+local generation = SAB.GetAnimalGeneration(animal.Index, animal.Mutation, animal.Traits)
+if price and generation then
+table.insert(animals, {
+plotUID = plot.UID,
+index = podiumIndex,
+price = price,
+generation = generation
+})
+end
+end
+end
+end
+end
+end
+
+if #animals == 0 then return end  
+
+local keysTable = {}  
+if bit32.band(self.highlightMode, HighlightModeEnum.Price) ~= 0 then  
+    table.insert(keysTable, "price")  
+end  
+if bit32.band(self.highlightMode, HighlightModeEnum.Generation) ~= 0 then  
+    table.insert(keysTable, "generation")  
+end  
+
+for _, v in pairs(getBestByKeys(animals, keysTable)) do  
+    local s, bestAnimalGuiModel = pcall(function()  
+        return workspace.Plots[v.plotUID].AnimalPodiums[v.index]  
+    end)  
+    if s and bestAnimalGuiModel then  
+        local animalGui = bestAnimalGuiModel:FindFirstChild("AnimalOverhead", true)  
+        if animalGui then  
+            table.insert(matchingGuis, animalGui)  
+        end  
+    end  
+end  
+return matchingGuis
+
+end
+
+function SAB.HighlightBestPlotAnimals:GetBestAnimalGuisForPlot(plot)
+local matchingGuis, animals = {}, {}
+local plotAnimals = SAB.GetPlotAnimals(plot)
+if not plotAnimals then return end
+
+for podiumIndex, animal in pairs(plotAnimals) do  
+    if animal ~= "Empty" and animal.Steal == false then  
+        local price = SAB.GetAnimalPrice(animal.Index)  
+        local generation = SAB.GetAnimalGeneration(animal.Index, animal.Mutation, animal.Traits)  
+        if price and generation then  
+            table.insert(animals, {  
+                index = podiumIndex,  
+                price = price,  
+                generation = generation  
+            })  
+        end  
+    end  
+end  
+
+if #animals == 0 then return end  
+
+local keysTable = {}  
+if bit32.band(self.highlightMode, HighlightModeEnum.Price) ~= 0 then  
+    table.insert(keysTable, "price")  
+end  
+if bit32.band(self.highlightMode, HighlightModeEnum.Generation) ~= 0 then  
+    table.insert(keysTable, "generation")  
+end  
+
+for _, v in pairs(getBestByKeys(animals, keysTable)) do  
+    local s, bestAnimalGuiModel = pcall(function()  
+        return workspace.Plots[plot.UID].AnimalPodiums[v.index]  
+    end)  
+    if s and bestAnimalGuiModel then  
+        local animalGui = bestAnimalGuiModel:FindFirstChild("AnimalOverhead", true)  
+        if animalGui then  
+            table.insert(matchingGuis, animalGui)  
+        end  
+    end  
+end  
+return matchingGuis
+
+end
+
+function SAB.HighlightBestPlotAnimals:Toggle(boolean)
+if boolean and not self.isRunning then
+self.enabled = true
+elseif not boolean and self.enabled then
+self.enabled = false
+return
+end
+self.isRunning = true
+
+local function setAnimalGuiHuge(animalGui, bool)  
+    if bool then  
+        animalGui.AlwaysOnTop = true  
+        animalGui.MaxDistance = 9999  
+        animalGui.Size = UDim2.fromScale(100, 35)  
+        table.insert(self.lastGuis, animalGui)  
+    else  
+        animalGui.AlwaysOnTop = false  
+        animalGui.MaxDistance = 60  
+        animalGui.Size = UDim2.fromScale(15, 5)  
+    end  
+end  
+
+local function addHighlight(model)  
+    local highlight = Instance.new("Highlight")  
+    highlight.FillColor = Color3.fromRGB(0, 255, 0)  
+    highlight.OutlineColor = Color3.fromRGB(0, 255, 0)  
+    highlight.Parent = model  
+    table.insert(self.lastHighlights, highlight)  
+end  
+
+local function cleanupEverything()  
+    for _, v in pairs(self.lastHighlights) do  
+        if v then v:Destroy() end  
+    end  
+    for _, v in pairs(self.lastGuis) do  
+        setAnimalGuiHuge(v, false)  
+    end  
+    table.clear(self.lastHighlights)  
+    table.clear(self.lastGuis)  
+end  
+
+while task.wait(self.CHECK_DELAY) and self.enabled do  
+    cleanupEverything()  
+    local bestAnimal  
+    local maxGeneration = -math.huge  
+    for _, plot in pairs(SAB.GetPlots()) do  
+        if not (self.excludeOwnBase and plot == SAB.GetPlot()) then  
+            local plotAnimals = SAB.GetPlotAnimals(plot)  
+            if plotAnimals then  
+                for podiumIndex, animal in pairs(plotAnimals) do  
+                    if animal ~= "Empty" and animal.Steal == false then  
+                        local value = SAB.GetAnimalGeneration(animal.Index, animal.Mutation, animal.Traits)  
+                        if value and value > maxGeneration then  
+                            maxGeneration = value  
+                            bestAnimal = {plotUID = plot.UID, index = podiumIndex}  
+                        end  
+                    end  
+                end  
+            end  
+        end  
+    end  
+
+    if bestAnimal then  
+        local s, model = pcall(function()  
+            return workspace.Plots[bestAnimal.plotUID].AnimalPodiums[bestAnimal.index]  
+        end)  
+        if s and model then  
+            local gui = model:FindFirstChild("AnimalOverhead", true)  
+            if gui then setAnimalGuiHuge(gui, true) end  
+            addHighlight(model)  
+        end  
+    end  
+end  
+
+cleanupEverything()  
+self.isRunning = false
+
+end
+
+-- =========================================================
+-- ðŸŸ¢ Highlight Plot Timers
+-- =========================================================
+SAB.BigPlotTimers = {}
+
+function SAB.BigPlotTimers:Toggle(boolean)
+if self.Init then self:Init() end
+if boolean and not self.isRunning then
+self.enabled = true
+elseif not boolean and self.enabled then
+self.enabled = false
+end
+
+self.isRunning = true  
+while task.wait() and self.enabled do  
+    pcall(function()  
+        for _, v in workspace.Plots:GetChildren() do  
+            v.Purchases.PlotBlock.Main.BillboardGui.AlwaysOnTop = true  
+            v.Purchases.PlotBlock.Main.BillboardGui.MaxDistance = 1000  
+            v.Purchases.PlotBlock.Main.BillboardGui.Size = UDim2.fromScale(35, 50)  
+        end  
+    end)  
+end  
+pcall(function()  
+    for _, v in workspace.Plots:GetChildren() do  
+        v.Purchases.PlotBlock.Main.BillboardGui.AlwaysOnTop = false  
+        v.Purchases.PlotBlock.Main.BillboardGui.MaxDistance = 60  
+        v.Purchases.PlotBlock.Main.BillboardGui.Size = UDim2.fromScale(7, 10)  
+    end  
+end)  
+self.isRunning = false
+
+end
+
+
+
+
+
+
+local StealTab = Window:CreateTab({
+    Name = "Stealer (New)",
+    Icon = "flash_on", -- Schnelligkeit / Action beim Stehlen
+    ImageSource = "Material",
+    ShowTitle = true
+})
+
+local HelpTab = Window:CreateTab({
+    Name = "Steal Helper",
+    Icon = "build", -- Werkzeug / Unterstützung
+    ImageSource = "Material",
+    ShowTitle = true
+})
+
+local BuyTab = Window:CreateTab({
+    Name = "Buy Animals",
+    Icon = "shopping_cart", -- Kaufen / Shop
+    ImageSource = "Material",
+    ShowTitle = true
+})
+
+local EspTab = Window:CreateTab({
+    Name = "ESP",
+    Icon = "visibility", -- Sehen / Überwachung
+    ImageSource = "Material",
+    ShowTitle = true
+})
+
+local WebTab = Window:CreateTab({
+    Name = "Webhook Scanner",
+    Icon = "link", -- Web / Verbindung
+    ImageSource = "Material",
+    ShowTitle = true
+})
+
+local ServerTab = Window:CreateTab({
+    Name = "Server Actions",
+    Icon = "storage", -- Server / Datenbank
+    ImageSource = "Material",
+    ShowTitle = true
+})
+
+local SettingsTab = Window:CreateTab({
+    Name = "Settings",
+    Icon = "settings", -- Einstellungen
+    ImageSource = "Material",
+    ShowTitle = true
+})
+
+
+
+StealTab:CreateSection("FPS Killer")
+
+
+-- == Services ==
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- == FPS Devourer (Multi-Tools, zufällig mehrere gleichzeitig) ==
+local FPSDevourer = {}
+do
+    FPSDevourer.running = false
+    
+    -- Liste mit Tools, die er nutzen darf
+    local TOOL_NAMES = {
+        "Tung Bat",
+        "Rainbowrath Sword",
+        "Coil Combo",
+        "Quantum Cloner",
+        "Web Slinger",
+        "Medusa's Head",
+        "Laser Cape"
+    }
+
+    local function equipTool(toolName)
+        local character = player.Character
+        local backpack = player:FindFirstChild("Backpack")
+        if not character or not backpack then return false end
+        local tool = backpack:FindFirstChild(toolName)
+        if tool then tool.Parent = character return true end
+        return false
+    end
+
+    local function unequipTool(toolName)
+        local character = player.Character
+        local backpack = player:FindFirstChild("Backpack")
+        if not character or not backpack then return false end
+        local tool = character:FindFirstChild(toolName)
+        if tool then tool.Parent = backpack return true end
+        return false
+    end
+
+    -- wählt zufällig n verschiedene Tools aus der Liste
+    local function getRandomTools(n)
+        local copy = table.clone(TOOL_NAMES)
+        local chosen = {}
+        for i = 1, math.min(n, #copy) do
+            local idx = math.random(1, #copy)
+            table.insert(chosen, copy[idx])
+            table.remove(copy, idx)
+        end
+        return chosen
+    end
+
+    function FPSDevourer:Start()
+        if FPSDevourer.running then return end
+        FPSDevourer.running = true
+        FPSDevourer._stop = false
+        task.spawn(function()
+            while FPSDevourer.running and not FPSDevourer._stop do
+                -- 2 bis 3 Tools zufällig auswählen
+                local count = math.random(2, 3)
+                local tools = getRandomTools(count)
+
+                -- equippe alle ausgewählten Tools
+                for _, toolName in ipairs(tools) do
+                    equipTool(toolName)
+                end
+                task.wait(0.015)
+
+                -- unequippe alle ausgewählten Tools
+                for _, toolName in ipairs(tools) do
+                    unequipTool(toolName)
+                end
+                task.wait(0.015)
+            end
+        end)
+    end
+
+    function FPSDevourer:Stop()
+        FPSDevourer.running = false
+        FPSDevourer._stop = true
+        -- beim Stop alle Tools unequipen
+        local character = player.Character
+        local backpack = player:FindFirstChild("Backpack")
+        if character and backpack then
+            for _, t in ipairs(character:GetChildren()) do
+                if t:IsA("Tool") then
+                    t.Parent = backpack
+                end
+            end
+        end
+    end
+
+    player.CharacterAdded:Connect(function()
+        FPSDevourer.running = false
+        FPSDevourer._stop = true
+    end)
+end
+
+-- == Accessory Remover ==
+local function removeAllAccessoriesFromCharacter()
+    local character = player.Character
+    if not character then return end
+    for _, item in ipairs(character:GetChildren()) do
+        if item:IsA("Accessory")
+            or item:IsA("LayeredClothing")
+            or item:IsA("Shirt")
+            or item:IsA("ShirtGraphic")
+            or item:IsA("Pants")
+            or item:IsA("BodyColors")
+            or item:IsA("CharacterMesh") then
+            pcall(function() item:Destroy() end)
+        end
+    end
+end
+
+
+local charConn
+local ToggleFPS = StealTab:CreateToggle({
+    Name = "FPS Killer",
+    Description = "",
+    CurrentValue = false,
+    Callback = function(Value)
+        if Value then
+            removeAllAccessoriesFromCharacter()
+            FPSDevourer:Start()
+            charConn = player.CharacterAdded:Connect(function()
+                task.wait(0.2)
+                removeAllAccessoriesFromCharacter()
+            end)
+        else
+            FPSDevourer:Stop()
+            if charConn then
+                charConn:Disconnect()
+                charConn = nil
+            end
+        end
+    end
+}, "FPSKillerToggle")
+
+
+
+local Button = StealTab:CreateButton({
+    Name = "Get Auras",
+    Description = nil,
+    Callback = function()
+        -- Notification 1: Warnung
+        Luna:Notification({
+            Title = "H4x Hub",
+            Icon = "alert-circle",  -- passende Lucide-Icon
+            ImageSource = "Material",
+            Content = "Dont have Auras?"
+        })
+        task.wait(1) -- 1 Sekunde Pause
+
+        -- Notification 2: Discord Hinweis
+        Luna:Notification({
+            Title = "H4x Hub",
+            Icon = "link",  -- passende Lucide-Icon
+            ImageSource = "Material",
+            Content = "Join Our Discord Server to Get Auras"
+        })
+        task.wait(1) -- 1 Sekunde Pause
+
+        -- Notification 3: Erfolg
+        Luna:Notification({
+            Title = "H4x Hub",
+            Icon = "check-circle",  -- passende Lucide-Icon
+            ImageSource = "Material",
+            Content = "Successfully Copied Link"
+        })
+
+        
+        setclipboard("https://discord.gg/h4xscripts")
+    end
+})
+
+
+
+StealTab:CreateSection("Stealer Section")
+
+
+
+
+local Toggle = StealTab:CreateToggle({
+    Name = "Float to Base",
+    Description = "",
+    CurrentValue = false,
+    Callback = function(state)
+     local player = game:GetService("Players").LocalPlayer
+        local Players = game:GetService("Players")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local gui = player:FindFirstChild("PlayerGui"):FindFirstChild("FloatGui")
+
+        -- GUI vorhanden? Nur an/aus
+        if gui then
+            gui.Enabled = state
+            return
+        end
+
+        if state then
+      --// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+------------------------------------------------------
+-- FLOAT VARIABLEN
+------------------------------------------------------
+local floatEnabled = false
+local floatConnection
+
+-- Distanzwerte
+local horizontalReach = 20
+local verticalReach   = 40
+
+-- Funktion: Finde dein eigenes AnimalTarget
+local function getMyAnimalTarget()
+    local myPlot
+    for _, plot in pairs(Workspace.Plots:GetChildren()) do
+        local yourBase = plot:FindFirstChild("YourBase", true)
+        if yourBase and yourBase.Enabled then
+            myPlot = plot
+            break
+        end
+    end
+    if not myPlot then return nil end
+    return myPlot:FindFirstChild("AnimalTarget", true)
+end
+
+-- Prüfen, ob du über deinem AnimalTarget bist
+local function isOverMyAnimalTarget()
+    local target = getMyAnimalTarget()
+    if not target or not humanoidRootPart then return false end
+
+    local hrpXZ = Vector3.new(humanoidRootPart.Position.X, 0, humanoidRootPart.Position.Z)
+    local tgtXZ = Vector3.new(target.Position.X, 0, target.Position.Z)
+    local horizontalDist = (hrpXZ - tgtXZ).Magnitude
+
+    local verticalDist = math.abs(humanoidRootPart.Position.Y - target.Position.Y)
+
+    return horizontalDist <= horizontalReach and verticalDist <= verticalReach
+end
+
+local function stopFloat(resetGUI)
+    if floatConnection then
+        floatConnection:Disconnect()
+        floatConnection = nil
+    end
+    floatEnabled = false
+    if resetGUI then
+        switch.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
+        knob:TweenPosition(UDim2.new(0, 3, 0.5, -10), "Out", "Sine", 0.2, true)
+    end
+end
+
+local function startFloat()
+    if floatConnection then floatConnection:Disconnect() end
+    floatConnection = RunService.Heartbeat:Connect(function()
+        if floatEnabled and humanoidRootPart then
+            local target = getMyAnimalTarget()
+            if not target then return end
+
+            -- Stoppe Float, wenn nah genug
+            if isOverMyAnimalTarget() then
+                stopFloat(true)
+                return
+            end
+
+            -- Richtung zum Ziel (nur X/Z)
+            local directionXZ = Vector3.new(target.Position.X, 0, target.Position.Z) - 
+                                Vector3.new(humanoidRootPart.Position.X, 0, humanoidRootPart.Position.Z)
+            local distanceXZ = directionXZ.Magnitude
+            local moveXZ = Vector3.new(0,0,0)
+            if distanceXZ > 0 then
+                moveXZ = directionXZ.Unit * math.min(distanceXZ, 25)  -- Max-Speed X/Z
+            end
+
+            -- Y Velocity nullen → bleibt auf aktueller Höhe
+            humanoidRootPart.Velocity = Vector3.new(moveXZ.X, 0, moveXZ.Z)
+        end
+    end)
+end
+
+------------------------------------------------------
+-- GUI Aufbau
+------------------------------------------------------
+local gui = Instance.new("ScreenGui")
+gui.Name = "FloatGui"
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 220, 0, 50)
+main.Position = UDim2.new(1, -250, 0, 160)
+main.AnchorPoint = Vector2.new(0.5, 0.5)
+main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+main.Parent = gui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 15)
+
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 3
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+stroke.Parent = main
+
+task.spawn(function()
+    local t = 0
+    while task.wait(0.05) do
+        t = t + 0.01
+        stroke.Color = Color3.fromHSV(t % 1, 1, 1)
+    end
+end)
+
+main.Active = true
+main.Draggable = true
+
+local icon = Instance.new("ImageLabel")
+icon.Size = UDim2.new(0, 30, 0, 30)
+icon.Position = UDim2.new(0, 10, 0.5, -15)
+icon.BackgroundTransparency = 1
+icon.Image = "rbxassetid://137533064322256"
+icon.Parent = main
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(0, 120, 1, 0)
+label.Position = UDim2.new(0, 50, 0, 0)
+label.BackgroundTransparency = 1
+label.Text = "Float V2"
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextSize = 18
+label.Font = Enum.Font.GothamBold
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.Parent = main
+
+switch = Instance.new("TextButton")
+switch.Size = UDim2.new(0, 50, 0, 25)
+switch.Position = UDim2.new(1, -60, 0.5, -12)
+switch.AnchorPoint = Vector2.new(0, 0)
+switch.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
+switch.Text = ""
+switch.Parent = main
+Instance.new("UICorner", switch).CornerRadius = UDim.new(1, 0)
+
+knob = Instance.new("Frame")
+knob.Size = UDim2.new(0, 20, 0, 20)
+knob.Position = UDim2.new(0, 3, 0.5, -10)
+knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+knob.Parent = switch
+Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+------------------------------------------------------
+-- SWITCH LOGIK FÜR FLOAT
+------------------------------------------------------
+switch.MouseButton1Click:Connect(function()
+    floatEnabled = not floatEnabled
+    if floatEnabled then
+        switch.BackgroundColor3 = Color3.fromRGB(3, 252, 48)
+        knob:TweenPosition(UDim2.new(1, -23, 0.5, -10), "Out", "Sine", 0.2, true) 
+        
+        startFloat()
+    else
+        stopFloat(true)
+    end
+end)
+        end
+    end
+}, "Toggle")
+
+
+
+
+
+local Toggle = StealTab:CreateToggle({
+    Name = "Steal Up Stairs",
+    Description = "",
+    CurrentValue = false,
+    Callback = function(state)
+     local player = game:GetService("Players").LocalPlayer
+        local Players = game:GetService("Players")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local gui = player:FindFirstChild("PlayerGui"):FindFirstChild("AutoStealGui")
+
+        -- GUI vorhanden? Nur an/aus
+        if gui then
+            gui.Enabled = state
+            return
+        end
+
+        if state then
+               --// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+
+--========================
+-- SETTINGS
+--========================
+local MIN_HOLD_TIME = 2.00 -- Mindesthaltezeit
+_G.AutoStealEnabled = false
+
+--========================
+-- VARIABLES
+--========================
+local platformPart = nil
+local partConn = nil
+local switch, knob
+
+--========================
+-- FUNCTIONS
+--========================
+local function enablePart()
+    if not platformPart then
+        platformPart = Instance.new("Part")
+        platformPart.Size = Vector3.new(6,1,6)
+        platformPart.Anchored = true
+        platformPart.CanCollide = true
+        platformPart.Color = Color3.fromRGB(0,255,0)
+        platformPart.Parent = workspace
+
+        partConn = RunService.Heartbeat:Connect(function()
+            if hrp and platformPart then
+                platformPart.Position = hrp.Position - Vector3.new(0,3,0)
+            end
+        end)
+    end
+end
+
+local function disablePart()
+    if partConn then partConn:Disconnect(); partConn=nil end
+    if platformPart then platformPart:Destroy(); platformPart=nil end
+end
+
+-- 🟢 StealAll
+local function StealAll()
+    for _, prompt in pairs(workspace:GetDescendants()) do  
+        if prompt:IsA("ProximityPrompt") and prompt.ActionText == "Steal" and prompt.ObjectText ~= nil then       
+            local attachment = prompt.Parent  
+            if attachment and attachment:IsA("Attachment") then  
+                local pos = attachment.WorldPosition  
+                local distance = (hrp.Position - pos).Magnitude  
+                if distance <= 20 then  
+                    prompt:InputHoldBegin()
+                    task.wait(MIN_HOLD_TIME)
+                    prompt:InputHoldEnd()
+                end  
+            end  
+        end
+    end
+end
+
+-- Prompt-Handler
+local function connectPrompt(prompt)
+    if not prompt or not prompt:IsA("ProximityPrompt") then return end
+    if prompt.ActionText ~= "Steal" then return end
+
+    prompt.Triggered:Connect(function()
+        if not _G.AutoStealEnabled then return end
+        task.spawn(function()
+            task.wait(MIN_HOLD_TIME)
+            if prompt:IsDescendantOf(workspace) and _G.AutoStealEnabled then
+                _G.AutoStealEnabled = false
+                disablePart()
+
+for _, part in pairs(workspace.Plots:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.LocalTransparencyModifier = 0
+            end
+        end
+
+                -- GUI Switch zurücksetzen
+                switch.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
+                knob:TweenPosition(UDim2.new(0, 3, 0.5, -10), "Out", "Sine", 0.2, true)
+            end
+        end)
+    end)
+end
+
+-- Alle vorhandenen Prompts verbinden
+for _, obj in pairs(workspace:GetDescendants()) do
+    pcall(connectPrompt, obj)
+end
+workspace.DescendantAdded:Connect(function(obj)
+    pcall(connectPrompt, obj)
+end)
+
+--========================
+-- GUI
+--========================
+local gui = Instance.new("ScreenGui")
+gui.Name = "AutoStealGui"
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 220, 0, 50)
+main.Position = UDim2.new(1, -250, 0, 250)
+main.AnchorPoint = Vector2.new(0.5, 0.5)
+main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+main.Parent = gui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 15)
+
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 3
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+stroke.Parent = main
+task.spawn(function()
+    local t = 0
+    while task.wait(0.05) do
+        t = t + 0.01
+        stroke.Color = Color3.fromHSV(t % 1, 1, 1)
+    end
+end)
+
+main.Active = true
+main.Draggable = true
+
+local icon = Instance.new("ImageLabel")
+icon.Size = UDim2.new(0, 30, 0, 30)
+icon.Position = UDim2.new(0, 10, 0.5, -15)
+icon.BackgroundTransparency = 1
+icon.Image = "rbxassetid://137533064322256"
+icon.Parent = main
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(0, 120, 1, 0)
+label.Position = UDim2.new(0, 50, 0, 0)
+label.BackgroundTransparency = 1
+label.Text = "Up Stairs"
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextSize = 18
+label.Font = Enum.Font.GothamBold
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.Parent = main
+
+switch = Instance.new("TextButton")
+switch.Size = UDim2.new(0, 50, 0, 25)
+switch.Position = UDim2.new(1, -60, 0.5, -12)
+switch.AnchorPoint = Vector2.new(0, 0)
+switch.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
+switch.Text = ""
+switch.Parent = main
+Instance.new("UICorner", switch).CornerRadius = UDim.new(1, 0)
+
+knob = Instance.new("Frame")
+knob.Size = UDim2.new(0, 20, 0, 20)
+knob.Position = UDim2.new(0, 3, 0.5, -10)
+knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+knob.Parent = switch
+Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+
+switch.MouseButton1Click:Connect(function()
+    _G.AutoStealEnabled = not _G.AutoStealEnabled
+    if _G.AutoStealEnabled then
+        switch.BackgroundColor3 = Color3.fromRGB(3, 252, 48)
+        knob:TweenPosition(UDim2.new(1, -23, 0.5, -10), "Out", "Sine", 0.2, true)
+        enablePart()
+
+        for _, part in pairs(workspace.Plots:GetDescendants()) do  
+            if part:IsA("BasePart") and part.Transparency < 0.5 then  
+                part.LocalTransparencyModifier = 0.5  
+            end  
+        end  
+    else  
+        disablePart()
+
+        for _, part in pairs(workspace.Plots:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.LocalTransparencyModifier = 0
+            end
+        end
+
+        switch.BackgroundColor3 = Color3.fromRGB(120, 120, 120)  
+        knob:TweenPosition(UDim2.new(0, 3, 0.5, -10), "Out", "Sine", 0.2, true)  
+    end
+end)
+
+--========================
+-- AUTO STEAL LOOP
+--========================
+task.spawn(function()
+    while true do
+        if _G.AutoStealEnabled then
+            pcall(StealAll)
+        end
+        task.wait(0.01)
+    end
+end)
+        end
+    end
+}, "Toggle")
+
+
+
+
+local Toggle = StealTab:CreateToggle({
+    Name = "Boogie Bomb Float",
+    Description = "This Requires 4 Rebirths",
+    CurrentValue = false,
+    Callback = function(state)
+     local player = game:GetService("Players").LocalPlayer
+        local Players = game:GetService("Players")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local gui = player:FindFirstChild("PlayerGui"):FindFirstChild("BoogieBombCarpetGui")
+
+        -- GUI vorhanden? Nur an/aus
+        if gui then
+            gui.Enabled = state
+            return
+        end
+
+        if state then
+       local player = game:GetService("Players").LocalPlayer
+        local Players = game:GetService("Players")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local gui = player:FindFirstChild("PlayerGui"):FindFirstChild("BoogieBombCarpetGui")
+
+        -- GUI vorhanden? Nur an/aus
+        if gui then
+            gui.Enabled = state
+            return
+        end
+
+        if state then
+--// Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local equipConn -- Heartbeat connection fürs Force-Equip
+
+--// Funktion: Boogie Bomb ausrüsten, kaufen falls nötig, und feuerbereit machen
+local function equipAndFireBoogieBomb()
+    local char = LocalPlayer.Character
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if not char or not backpack then return false end
+
+    local toolName = "Boogie Bomb"
+
+    -- Tool im Character oder Backpack suchen
+    local tool = char:FindFirstChild(toolName) or backpack:FindFirstChild(toolName)
+
+    -- Falls Tool fehlt → Kaufen
+    if not tool then
+        local requestBuy = ReplicatedStorage:FindFirstChild("Packages")
+            and ReplicatedStorage.Packages:FindFirstChild("Net")
+            and ReplicatedStorage.Packages.Net:FindFirstChild("RF/CoinsShopService/RequestBuy")
+
+        if requestBuy then
+            pcall(function()
+                requestBuy:InvokeServer(toolName)
+            end)
+
+            -- kurze Wartezeit bis es im Backpack erscheint
+            for _ = 1, 12 do
+                task.wait(0.25)
+                tool = backpack:FindFirstChild(toolName)
+                if tool then break end
+            end
+        end
+    end
+
+    -- Falls jetzt im Backpack → ausrüsten
+    if tool and tool.Parent == backpack then
+        tool.Parent = char
+        task.wait(0.05)
+    end
+
+    -- Wenn Tool im Character → feuern
+    if tool and tool.Parent == char then
+        local fireEvent = ReplicatedStorage:FindFirstChild("Packages")
+            and ReplicatedStorage.Packages:FindFirstChild("Net")
+            and ReplicatedStorage.Packages.Net:FindFirstChild("RE/UseItem")
+        if fireEvent then
+            pcall(function()
+                fireEvent:FireServer()
+            end)
+        end
+        return true
+    end
+    return false
+end
+
+--// Force Equip für 0.5 Sekunden
+local function forceEquipBoogieBomb()
+    if equipConn and equipConn.Connected then
+        equipConn:Disconnect()
+        equipConn = nil
+    end
+
+    local char = LocalPlayer.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if not humanoid or not backpack then return end
+
+    equipConn = RunService.Heartbeat:Connect(function()
+        local tool = char:FindFirstChild("Boogie Bomb") or backpack:FindFirstChild("Boogie Bomb")
+        if tool then
+            pcall(function() humanoid:EquipTool(tool) end)
+        end
+    end)
+
+    task.delay(0.5, function()
+        if equipConn and equipConn.Connected then
+            equipConn:Disconnect()
+            equipConn = nil
+        end
+        local tool = char:FindFirstChild("Boogie Bomb")
+        if tool then
+            pcall(function() tool.Parent = backpack end)
+        end
+    end)
+end
+
+--// Carpet Spawn Logik
+local function spawnBoogieCarpet()
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local bomb = workspace:FindFirstChild("Handle")
+    if bomb and hrp then
+        bomb.CFrame = hrp.CFrame * CFrame.new(0, -3.5, 0)
+        bomb.CanCollide = true
+    end
+end
+
+--// Carpet Logik
+local carpetActive = false
+local carpetConnection
+
+local function startCarpet()
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    -- Boogie Bomb equippen/kaufen/feuern
+    equipAndFireBoogieBomb()
+    forceEquipBoogieBomb()
+
+    carpetConnection = RunService.RenderStepped:Connect(function()
+        if not carpetActive then return end
+
+        -- Boogie Bomb feuer
+        ReplicatedStorage.Packages.Net["RE/UseItem"]:FireServer()
+        spawnBoogieCarpet()
+
+        -- Check Distanz zu AnimalTargets
+        local bomb = workspace:FindFirstChild("Handle")
+        if bomb then
+            for _, plot in pairs(workspace.Plots:GetChildren()) do
+                local target = plot:FindFirstChild("AnimalTarget", true)
+                if target and target:IsA("BasePart") then
+                    local dist = (Vector3.new(bomb.Position.X, 0, bomb.Position.Z) -
+                                  Vector3.new(target.Position.X, 0, target.Position.Z)).Magnitude
+                    if dist < 5 then
+                        stopCarpet()
+                        return
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- Stop Carpet
+function stopCarpet()
+    if carpetConnection then
+        carpetConnection:Disconnect()
+        carpetConnection = nil
+    end
+    carpetActive = false
+end
+
+--// GUI Aufbau (Duma Style)
+local gui = Instance.new("ScreenGui")
+gui.Name = "BoogieBombCarpetGui"
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 220, 0, 50)
+main.Position = UDim2.new(1, -250, 0, 70)
+main.AnchorPoint = Vector2.new(0.5, 0.5)
+main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+main.Parent = gui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 15)
+
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 3
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+stroke.Parent = main
+
+task.spawn(function()
+    local t = 0
+    while task.wait(0.05) do
+        t = t + 0.01
+        stroke.Color = Color3.fromHSV(t % 1, 1, 1)
+    end
+end)
+
+main.Active = true
+main.Draggable = true
+
+local icon = Instance.new("ImageLabel")
+icon.Size = UDim2.new(0, 30, 0, 30)
+icon.Position = UDim2.new(0, 10, 0.5, -15)
+icon.BackgroundTransparency = 1
+icon.Image = "rbxassetid://137533064322256"
+icon.Parent = main
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(0, 120, 1, 0)
+label.Position = UDim2.new(0, 50, 0, 0)
+label.BackgroundTransparency = 1
+label.Text = "Boogie Float"
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextSize = 18
+label.Font = Enum.Font.GothamBold
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.Parent = main
+
+local switch = Instance.new("TextButton")
+switch.Size = UDim2.new(0, 50, 0, 25)
+switch.Position = UDim2.new(1, -60, 0.5, -12)
+switch.AnchorPoint = Vector2.new(0, 0)
+switch.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
+switch.Text = ""
+switch.Parent = main
+Instance.new("UICorner", switch).CornerRadius = UDim.new(1, 0)
+
+local knob = Instance.new("Frame")
+knob.Size = UDim2.new(0, 20, 0, 20)
+knob.Position = UDim2.new(0, 3, 0.5, -10)
+knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+knob.Parent = switch
+Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+--// Switch Toggle Logik
+switch.MouseButton1Click:Connect(function()
+    carpetActive = not carpetActive
+    if carpetActive then
+        switch.BackgroundColor3 = Color3.fromRGB(3, 252, 48)
+        knob:TweenPosition(UDim2.new(1, -23, 0.5, -10), "Out", "Sine", 0.2, true) 
+        startCarpet()
+    else
+        stopCarpet()
+        switch.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
+        knob:TweenPosition(UDim2.new(0, 3, 0.5, -10), "Out", "Sine", 0.2, true)
+    end
+end)
+        end
+       end
+    end
+}, "Toggle")
+
+
+
+
+local Toggle = StealTab:CreateToggle({
+    Name = "Aimbot",
+    Description = "This Requires Laser Cape & Web Slinger",
+    CurrentValue = false,
+    Callback = function(state)
+     local player = game:GetService("Players").LocalPlayer
+        local Players = game:GetService("Players")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local gui = player:FindFirstChild("PlayerGui"):FindFirstChild("AimbotGui")
+
+        -- GUI vorhanden? Nur an/aus
+        if gui then
+            gui.Enabled = state
+            return
+        end
+
+        if state then
+       -- ANTI-KICK & ANTI-REJOIN
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+local oldNamecall = mt.__namecall
+mt.__namecall = newcclosure(function(self, ...)
+local method = getnamecallmethod()
+if method == "Kick" then
+warn("[AntiKick] Kick-Versuch blockiert!")
+return
+end
+if tostring(self) == "TeleportToPlaceInstance" or tostring(self) == "Teleport" then
+warn("[AntiRejoin] Teleport/Rejoin blockiert!")
+return
+end
+return oldNamecall(self, ...)
+end)
+setreadonly(mt, true)
+
+
+            gui = Instance.new("ScreenGui")
+            gui.Name = "AimbotGui"
+            gui.ResetOnSpawn = false
+            gui.Enabled = true
+            gui.Parent = player:WaitForChild("PlayerGui")
+
+            local frame = Instance.new("Frame", gui)
+            frame.Size = UDim2.new(0, 200, 0, 140)
+            frame.Position = UDim2.new(1, -500, 0, 100)
+            frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+            frame.Active = true
+            frame.Draggable = true
+            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+            local titleLabel = Instance.new("TextLabel", frame)
+            titleLabel.Size = UDim2.new(1, 0, 0, 25)
+            titleLabel.Position = UDim2.new(0, 0, 0, 5)
+            titleLabel.BackgroundTransparency = 1
+            titleLabel.Font = Enum.Font.GothamBold
+            titleLabel.TextSize = 18
+            titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            titleLabel.Text = "Aimbot Controller"
+
+            local aimbotActive = false
+            local laserCapeAimbotActive = false
+
+            local toolName = "Web Slinger"
+            local laserCapeToolName = "Laser Cape"
+
+            local maxRangeWeb = 30
+            local maxRangeLaser = 60
+
+            local function createToggleButton(yPos, label, getSetState)
+                local button = Instance.new("TextButton", frame)
+                button.Size = UDim2.new(1, -20, 0, 35)
+                button.Position = UDim2.new(0, 10, 0, yPos)
+                button.Font = Enum.Font.GothamBold
+                button.TextSize = 16
+                button.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+                local function updateColor()
+                    local state = getSetState()
+                    button.Text = label .. ": " .. (state and "ON" or "OFF")
+                    button.BackgroundColor3 = state and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(170, 0, 0)
+                end
+
+                button.MouseButton1Click:Connect(function()
+                    getSetState(not getSetState())
+                    updateColor()
+                end)
+
+                updateColor()
+            end
+
+            createToggleButton(35, "Web Slinger Aimbot", function(v)
+                if v ~= nil then aimbotActive = v end
+                return aimbotActive
+            end)
+
+            createToggleButton(80, "Laser Cape Aimbot", function(v)
+                if v ~= nil then laserCapeAimbotActive = v end
+                return laserCapeAimbotActive
+            end)
+
+            local function prepareTool(name)
+                local requestBuy = ReplicatedStorage.Packages.Net:FindFirstChild("RF/CoinsShopService/RequestBuy")
+                if requestBuy then
+                    pcall(function() requestBuy:InvokeServer(name) end)
+                end
+            end
+
+
+            local function getClosestTarget(maxRange)
+                local char = player.Character
+                if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+
+                local rootPos = char.HumanoidRootPart.Position
+                local closest, shortest = nil, math.huge
+
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                        if hum and hum.Health > 0 then
+                            local dist = (rootPos - p.Character.HumanoidRootPart.Position).Magnitude
+                            if dist < shortest and dist <= maxRange then
+                                shortest = dist
+                                closest = p.Character.HumanoidRootPart
+                            end
+                        end
+                    end
+                end
+                return closest
+            end
+
+            local function aimbotLoop(name, maxRange, isActive)
+                task.spawn(function()
+                    while task.wait(0.2) do
+                        if isActive() then
+                            local char = player.Character or player.CharacterAdded:Wait()
+                            local backpack = player:WaitForChild("Backpack")
+                       
+
+                            -- Equip tool falls nicht aktiv
+                            local tool = char:FindFirstChild(name) or backpack:FindFirstChild(name)
+                            if not tool then
+                                prepareTool(name)
+                                tool = char:FindFirstChild(name) or backpack:FindFirstChild(name)
+                            end
+                            if tool and tool.Parent ~= char then
+                                tool.Parent = char
+                            end
+
+                            local remote = ReplicatedStorage.Packages.Net:FindFirstChild("RE/UseItem")
+                            if remote and tool then
+                                local target = getClosestTarget(maxRange)
+                                if target then
+                                    remote:FireServer(target.Position, target)
+                                    print("Geschossen auf:", target.Parent.Name)
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+
+            aimbotLoop(toolName, maxRangeWeb, function() return aimbotActive end)
+            aimbotLoop(laserCapeToolName, maxRangeLaser, function() return laserCapeAimbotActive end)
+        end
+    end
+}, "Toggle")
+
+
+
+local Toggle = StealTab:CreateToggle({
+    Name = "Platform Float",
+    Description = "",
+    CurrentValue = false,
+    Callback = function(state)
+     local player = game:GetService("Players").LocalPlayer
+        local Players = game:GetService("Players")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local gui = player:FindFirstChild("PlayerGui"):FindFirstChild("H4xPum")
+
+        -- GUI vorhanden? Nur an/aus
+        if gui then
+            gui.Enabled = state
+            return
+        end
+
+        if state then
+       --// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+--========================
+-- GUI SETUP
+--========================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = playerGui
+
+
+
+gui = Instance.new("ScreenGui")
+			gui.Name = "H4xPum"
+			gui.ResetOnSpawn = false
+			gui.Enabled = false
+			gui.Parent = playerGui
+
+
+
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0, 200, 0, 60)
+button.Position = UDim2.new(0.4, 0, 0.8, 0)
+button.Text = "H4x Hub\nScript"
+button.TextColor3 = Color3.new(1,1,1)
+button.Font = Enum.Font.SourceSansBold
+button.TextScaled = true
+button.BackgroundColor3 = Color3.new(0,0,0)
+button.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = button
+
+local progressBar = Instance.new("Frame")
+progressBar.Size = UDim2.new(1, 0, 0.15, 0)
+progressBar.Position = UDim2.new(0, 0, 1, 0)
+progressBar.BackgroundColor3 = Color3.fromRGB(0,255,0)
+progressBar.BorderSizePixel = 0
+progressBar.Parent = button
+
+local progressCorner = Instance.new("UICorner")
+progressCorner.CornerRadius = UDim.new(0, 6)
+progressCorner.Parent = progressBar
+
+--========================
+-- Einstellungen
+--========================
+local holdTime = 2.5      -- Sekunden bis die Leiste leer ist
+local rechargeTime = 0.50    -- Sekunden bis sie sich wieder füllt
+local running = false
+local percent = 1
+local platformPart = nil
+local partConn = nil
+
+--========================
+-- FARB-LOGIK
+--========================
+local function updateColors()
+local color
+if percent > 0.6 then
+color = Color3.fromRGB(0,255,0) -- Grün
+elseif percent > 0.2 then
+color = Color3.fromRGB(255,255,0) -- Gelb
+else
+color = Color3.fromRGB(255,0,0) -- Rot
+end
+
+-- Progress-Bar einfärben  
+progressBar.BackgroundColor3 = color  
+
+-- Part einfärben (falls existiert)  
+if platformPart then  
+    platformPart.Color = color  
+end
+
+end
+
+--========================
+-- PART FUNKTION
+--========================
+local function enablePart()
+if not platformPart then
+platformPart = Instance.new("Part")
+platformPart.Size = Vector3.new(6,1,6)
+platformPart.Anchored = true
+platformPart.CanCollide = true
+platformPart.Color = Color3.fromRGB(0,255,0)
+platformPart.Parent = workspace
+
+partConn = RunService.Heartbeat:Connect(function()  
+        if hrp and platformPart then  
+            platformPart.Position = hrp.Position - Vector3.new(0,3,0)  
+            updateColors()  
+        end  
+    end)  
+end
+
+end
+
+local function disablePart()
+if partConn then partConn:Disconnect(); partConn=nil end
+if platformPart then platformPart:Destroy(); platformPart=nil end
+end
+
+--========================
+-- BUTTON HANDLER
+--========================
+button.MouseButton1Down:Connect(function()
+if running or percent <= 0 then return end
+running = true
+enablePart()
+
+while running and percent > 0 do  
+    percent = math.clamp(percent - (1 / (holdTime * 10)), 0, 1)  
+    progressBar.Size = UDim2.new(percent, 0, 0.15, 0)  
+    updateColors()  
+    task.wait(0.1)  
+end  
+
+disablePart()  
+running = false
+
+end)
+
+button.MouseButton1Up:Connect(function()
+running = false
+disablePart()
+
+while not running and percent < 1 do  
+    percent = math.clamp(percent + (1 / (rechargeTime * 10)), 0, 1)  
+    progressBar.Size = UDim2.new(percent, 0, 0.15, 0)  
+    updateColors()  
+    task.wait(0.1)  
+end
+
+end)
+end
+    end
+}, "Toggle")
+
+
+
+-- Others Section
+
+
+local player = game.Players.LocalPlayer
+local toggleActive = false
+local debounce = false
+
+-- Resetbare Countdown-Texte
+local resetableCountdowns = {
+    ["0s"] = true,
+    ["1s"] = true,
+    ["2s"] = true,
+    ["3s"] = true,
+    ["4s"] = true
+}
+
+local plots = workspace:WaitForChild("Plots")
+local myPlot = nil
+local myHitbox = nil
+local countdownLabel = nil
+
+-- Finde den eigenen Plot anhand des Namens/DisplayNamens
+do
+    local userLower = string.lower(player.Name)
+    local displayLower = string.lower(player.DisplayName)
+    for _, model in ipairs(plots:GetChildren()) do
+        if model:IsA("Model") then
+            for _, obj in ipairs(model:GetDescendants()) do
+                if obj:IsA("TextLabel") then
+                    local txt = string.lower(obj.Text)
+                    if string.find(txt, userLower, 1, true) 
+                    or string.find(txt, displayLower, 1, true) then
+                        myPlot = model
+                        break
+                    end
+                end
+            end
+            if myPlot then break end
+        end
+    end
+end
+
+-- Speichere Hitbox und CountdownLabel
+if myPlot then
+    local purchases = myPlot:WaitForChild("Purchases")
+    local plotBlock = purchases:WaitForChild("PlotBlock")
+    myHitbox = plotBlock:WaitForChild("Hitbox")
+
+    -- suche CountdownLabel im Plot
+    for _, obj in ipairs(purchases:GetDescendants()) do
+        if obj:IsA("TextLabel") and obj.Name == "RemainingTime" then
+            countdownLabel = obj
+            break
+        end
+    end
+end
+
+-- Funktion: laufe exakt zum eigenen PlotBlock
+local function walkToMyPlot()
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local hum = char:WaitForChild("Humanoid")
+
+    if not (hum and hrp and myHitbox) then return end
+
+    local targetPos = myHitbox.Position + Vector3.new(0, 2, 0) -- leicht drÃ¼ber
+    hum:MoveTo(targetPos)
+    hum.MoveToFinished:Wait()
+
+    if (hrp.Position - targetPos).Magnitude > 3 then
+        hum:MoveTo(targetPos)
+        hum.MoveToFinished:Wait()
+    end
+end
+
+-- Hauptloop
+local function monitorLoop()
+    while true do
+        task.wait(0.2)
+
+        if toggleActive and not debounce and countdownLabel and myHitbox then
+            if resetableCountdowns[countdownLabel.Text] then
+                debounce = true
+
+                -- Respawn fÃ¼r sichere Position
+                local char = player.Character or player.CharacterAdded:Wait()
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum.Health = 0
+                end
+
+                task.spawn(function()
+                    local newChar = player.CharacterAdded:Wait()
+                    newChar:WaitForChild("HumanoidRootPart")
+                    task.wait(0.5)
+
+                    walkToMyPlot()
+
+                    task.wait(6) -- kurze Pause, bevor wieder mÃ¶glich
+                    debounce = false
+                end)
+            end
+        end
+    end
+end
+
+task.spawn(monitorLoop)
+
+
+
+--// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local infiniteJumpEnabled = false
+
+--// Settings
+local infiniteJumpMin = 50
+local infiniteJumpMax = 55
+local jumpCooldown = 0.1
+
+
+--// State
+local lastJumpTime = 0
+local character, humanoid, rootPart
+local boostConnection = nil
+
+--// Rebinds character on spawn/reset
+local function bindCharacter(char)
+	character = char
+	humanoid = char:WaitForChild("Humanoid")
+	rootPart = char:WaitForChild("HumanoidRootPart")
+	local jumping = false
+
+	-- Clear old connection
+	if boostConnection then
+		boostConnection:Disconnect()
+	end
+
+	-- Jump Boost logic (trigger on jump state)
+	boostConnection = humanoid.StateChanged:Connect(function(_, new)
+		if new == Enum.HumanoidStateType.Jumping and not jumping and jumpBoostEnabled then
+			jumping = true
+
+			RunService.RenderStepped:Wait()
+			if rootPart and rootPart.Parent then
+				local currentVel = rootPart.Velocity
+				rootPart.Velocity = currentVel + Vector3.new(0, jumpBoostForce, 0)
+			end
+
+			task.delay(0.2, function()
+				jumping = false
+			end)
+		end
+	end)
+end
+
+--// Initial bind
+if LocalPlayer.Character then
+	bindCharacter(LocalPlayer.Character)
+end
+
+--// Rebind on respawn
+LocalPlayer.CharacterAdded:Connect(function(char)
+	bindCharacter(char)
+end)
+
+
+--// Infinite Jump: Trigger on JumpRequest
+UserInputService.JumpRequest:Connect(function()
+	if not infiniteJumpEnabled then return end
+	if not humanoid or not rootPart then return end
+	if tick() - lastJumpTime < jumpCooldown then return end
+
+	local state = humanoid:GetState()
+	if state == Enum.HumanoidStateType.Freefall or state == Enum.HumanoidStateType.Running or state == Enum.HumanoidStateType.Jumping then
+		local boost = math.random(infiniteJumpMin * 10, infiniteJumpMax * 10) / 10
+		rootPart.Velocity = Vector3.new(rootPart.Velocity.X, boost, rootPart.Velocity.Z)
+		lastJumpTime = tick()
+	end
+end)
+
+
+
+StealTab:CreateSection("LocalPlayer Section")
+
+
+local Toggle = StealTab:CreateToggle({
+    Name = "Infinite Jump",
+    Description = "This Will Make Your Jump Strengh higher",
+    CurrentValue = true,
+    Callback = function(Value)
+    infiniteJumpEnabled = Value
+    end
+}, "Toggle")
+
+
+
+--// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local Workspace = game:GetService("Workspace")
+
+--// Lokale Variablen
+local LocalPlayer = Players.LocalPlayer
+
+--// Settings
+local safeWalkSpeed = 25        -- WalkSpeed bei aktiviertem Speed
+local speedEnabled = false
+
+
+--// Speed aktivieren
+local function enableSpeed()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    humanoid.WalkSpeed = safeWalkSpeed
+    speedEnabled = true
+end
+
+--// Speed deaktivieren
+local function disableSpeed()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    humanoid.WalkSpeed = 16
+    speedEnabled = false
+end
+
+--// Toggle im Tab
+local Toggle = StealTab:CreateToggle({
+    Name = "Speed Boost",
+    Description = "",
+    CurrentValue = true,
+    Callback = function(Value)
+        if Value then
+            enableSpeed()
+        else
+            disableSpeed()
+        end
+    end
+}, "Toggle")
+
+--// Respawn-Support
+LocalPlayer.CharacterAdded:Connect(function(char)
+    if speedEnabled then
+        enableSpeed()
+        task.wait(0.5)
+    end
+end)
+
+
+
+StealTab:CreateSection("MyBase Section")
+
+
+local Toggle = StealTab:CreateToggle({
+    Name = "Auto Lock Base",
+    Description = "",
+    CurrentValue = false,
+    Callback = function(Value)
+        toggleActive = Value
+    end
+}, "Toggle")
+
+
+
+-- Auto Reminder
+local function findMyPlot()
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then return end
+    for _, plot in ipairs(plots:GetChildren()) do
+        local sign = plot:FindFirstChild("PlotSign")
+        if sign and sign:FindFirstChild("YourBase") and sign.YourBase.Enabled then
+            return plot
+        end
+    end
+end
+
+local function getRemainingSeconds(plot)
+    for _, obj in ipairs(plot:GetDescendants()) do
+        if obj:IsA("TextLabel") and obj.Name == "RemainingTime" and obj.Visible then
+            local seconds = tonumber(obj.Text:match("(%d+)"))
+            return seconds
+        end
+    end
+end
+
+
+
+local alarm
+local lockReminderEnabled = false
+
+local function CreateAlarm()
+    if not alarm then
+        alarm = Instance.new("Sound")
+        alarm.SoundId = "rbxassetid://2979857617"
+        alarm.Volume = 1.3
+        alarm.Looped = true
+        alarm.Parent = workspace
+    end
+end
+
+
+
+local Toggle = StealTab:CreateToggle({
+    Name = "Auto Reminder",
+    Description = "",
+    CurrentValue = false,
+    Callback = function(state)
+    lockReminderEnabled = state
+        if state then
+            CreateAlarm()
+        elseif alarm then
+            alarm:Stop()
+            alarm:Destroy()
+            alarm = nil
+        end
+    end
+}, "Toggle")
+
+
+
+task.spawn(function()
+    while true do
+        if lockReminderEnabled then
+            local plot = findMyPlot()
+            if plot then
+                local remaining = getRemainingSeconds(plot)
+                if remaining then
+                    if remaining <= 10 then
+                        game.StarterGui:SetCore("SendNotification", {
+                            Title = "BASE REMINDER",
+                            Text = "10 Seconds Left!",
+                            Icon = "alert-triangle", -- Beispiel
+                            Duration = 5,
+                        })
+                        if alarm and not alarm.IsPlaying then
+                            alarm:Play()
+                        end
+                    else
+                        if alarm and alarm.IsPlaying then
+                            alarm:Stop()
+                        end
+                    end
+                else
+                    game.StarterGui:SetCore("SendNotification", {
+                        Title = "Base Unlocked",
+                        Text = "Successfully Unlocked",
+                        Icon = "rbxassetid://11157772247",
+                        Duration = 5,
+                    })
+                    if alarm and alarm.IsPlaying then
+                        alarm:Stop()
+                    end
+                end
+            else
+                game.StarterGui:SetCore("SendNotification", {
+                    Title = "BASE REMINDER",
+                    Text = "Searching for base...",
+                    Icon = "rbxassetid://5107150301",
+                    Duration = 5,
+                })
+                if alarm and not alarm.IsPlaying then
+                    alarm:Play()
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+
+
+
+HelpTab:CreateSection("Steal Helper")
+
+
+
+
+
+
+local plotName
+for _, plot in ipairs(workspace.Plots:GetChildren()) do
+    local base = plot:FindFirstChild("YourBase", true)
+    if base and base.Enabled then
+        plotName = plot.Name
+        break
+    end
+end
+
+local remainingTimeLabel = workspace.Plots[plotName].Purchases.PlotBlock.Main.BillboardGui.RemainingTime
+
+local Timer = HelpTab:CreateParagraph({
+    Title = "Lock Time",
+    Text = remainingTimeLabel.Text
+})
+
+task.spawn(function()
+    while true do
+        local t = remainingTimeLabel.Text
+        Timer.Text = (t == "0s" and "Plot is Not Locked" or ("Lock Time: " .. t))
+        task.wait(0.25)
+    end
+end)
+
+
+local RarityPets = {
+    Common = {"Noobini Pizzanini", "Fluriflura", "Lirilì Larilà", "Pipi Kiwi", "Pipi Corny", "Svinina Bombardino", "Talpa Di Fero", "Tim Cheese", "Pipi Avocado"},
+    Rare = {"Bandito Bobritto", "Boneca Ambalabu", "Cacto Hipopotamo", "Gangster Footera", "Ta Ta Ta Ta Sahur", "Tric Trac Baraboom", "Trippi Troppi", "Tung Tung Tung Sahur"},
+    Epic = {"Penguino Cocosino", "Salamino Penguino", "Avocadini Guffo","Bambini Crostini","Bananaita Dolphinita","Brr Brr Patapim", "Brri Brri Dicus Bombicus", "Cappuccino Assasino","Perochello Lemonchello","Trulimero Trulicina", "Avocadini Antilopini"},
+    Mythic = {"Carrotini Brainini", "Tracoducotulu Delapeladustuz", "Tob Tobi Tobi", "Ganganzelli Trulala", "Bombardiro Crocodilo", "Bombombini Gusini", "Cavallo Virtuoso", "Frigo Camelo", "Mythic Lucky Block", "Orangutini Ananassini", "Rhino Toasterino", "Spioniro Golubiro", "Tigrilini Watermelini", "Zibra Zubra Zibralini", "Lerulerulerule", "Carloo"},
+    Legendary = {"Quivoli Ameleonni", "Ballerina Cappuccina", "Blueberrinni Octopusini", "Burbaloni Loliloli", "Strawberry Flamingelli","Pipi Potato","Cocosini Mama","Pandaccini Bananini","Pi Pi Watermelon","Sigma Boy", "Chef Crabracadabra", "Chimpanzini Bananini", "Glorbo Fruttodrillo", "Lionel Cactuseli", "Pandaccini Bananini"},
+["Brainrot God"] = {"Gattatino Nyanino", "Cacasito Satalito", "Crabbo Limonetta", "Mastodontico Tellepiedone", "Gattito Tacico", "Chihuanini Taconini", "Los Tipi Tacos", "Tralalero Tralala", "Tralalita tralala", "Bulbito Bandito Traktorito", "Unclito Samito", "Alessio", "Urubini Flamenguini", "Pakrahmatmamat", "Brr es Teh Patipum", "Tartarauga Cisterna", "Ballerino Lololo", "Tipi Topi Taco", "Espresso Signora", "Gattatino Neonino", "Los Orcalitos", "Los Crocodillitos", "Los Bombinitos", "Piccione Macchina", "Tukanno Bananno","Trippy Troppi Troppa Trippa", "Los Tungtungtungcitos", "Brainrot God Lucky Block", "Cocofanto Elefanto", "Girafa Celestre", "Matteo", "Odin Din Din Dun", "Orcalero Orcala", "Statutino Libertino", "Tigroligre Frutooni", "Trenostruzzo Turbo 3000"},
+    Secret = {"Bisonte Giuppitere", "Dul Dul Dul", "Blackhole Goat", "Los Spyderinis", "Ketupat Kepat", "Karkerkar Kurkur", "Los Matteos", "Esok Sekolah", "Los Hotspotsitos", "Garama and Madundung", "Las Vaquitas Saturnitas", "Nuclearo Dinossauro", "Chimpanzini Spiderini", "Graipuss Medussi", "La Grande Combinasion", "La Supreme Combinasion", "Agarrini la Palini","Dragon Cannelloni","Los Combinasionas", "La Vacca Saturno Saturnita", "Las Tralaleritas", "Los Tralaleritos", "Pot Hotspot", "Secret Lucky Block", "Torrtugini Dragonfrutini", "Spaghetti Tualetti", "Los Noo My Hotspotsitos", "Strawberry Elephant"}
+}
+
+
+
+-- Alle Pets in Brainrot Dropdown
+local allPets = {}
+for _, pets in pairs(RarityPets) do
+    for _, pet in ipairs(pets) do
+        table.insert(allPets, pet)
+    end
+end
+
+local SelectBrainrot = HelpTab:CreateDropdown({
+    Name = "Select Brainrot",
+    Description = "Only selected brainrots will be stolen",
+    Options = allPets,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Callback = function(values)
+        selectedPets = {}
+        for _, petName in ipairs(values) do
+            selectedPets[petName] = true
+        end
+    end
+})
+
+
+-- ===============================
+-- TOGGLES
+-- ===============================
+local StealToggle = HelpTab:CreateToggle({
+    Name = "Insta Steal Filtered Brainrots",
+    Description = "Only steals selected pets from dropdown",
+    CurrentValue = false,
+    Callback = function(v)
+        _G.AutoStealEnabled = v
+    end
+})
+
+local StealAllToggle = HelpTab:CreateToggle({
+    Name = "Insta Steal All Brainrots",
+    Description = "Automatically steals all nearby pets",
+    CurrentValue = false,
+    Callback = function(v)
+        _G.AutoStealAllEnabled = v
+    end
+})
+
+-- ===============================
+-- STEAL FUNCTIONS
+-- ===============================
+function Steal()
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+
+    for _, prompt in pairs(workspace:GetDescendants()) do    
+        if prompt:IsA("ProximityPrompt") and prompt.ActionText == "Steal" then         
+            local petName = prompt.ObjectText    
+            if selectedPets[petName] then    
+                local attachment = prompt.Parent    
+                if attachment and attachment:IsA("Attachment") then    
+                    local pos = attachment.WorldPosition    
+                    local distance = (character.HumanoidRootPart.Position - pos).Magnitude    
+                    if distance <= 20 then    
+                        prompt:InputHoldBegin()    
+                    end    
+                end    
+            end    
+        end    
+    end
+end
+
+function StealAll()
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+
+    for _, prompt in pairs(workspace:GetDescendants()) do  
+        if prompt:IsA("ProximityPrompt") and prompt.ActionText == "Steal" and prompt.ObjectText ~= nil then       
+            local attachment = prompt.Parent  
+            if attachment and attachment:IsA("Attachment") then  
+                local pos = attachment.WorldPosition  
+                local distance = (character.HumanoidRootPart.Position - pos).Magnitude  
+                if distance <= 20 then  
+                    prompt:InputHoldBegin()  
+                end  
+            end  
+        end  
+    end
+end
+
+-- ===============================
+-- AUTO STEAL TASKS
+-- ===============================
+task.spawn(function()
+    while true do
+        if _G.AutoStealEnabled then
+            pcall(Steal)
+        end
+        if _G.AutoStealAllEnabled then
+            pcall(StealAll)
+        end
+        task.wait(0.5)
+    end
+end)
+
+
+
+-- Purchase Animals
+BuyTab:CreateSection("Purchase Moving Animals")
+
+
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local currentTween
+
+
+local RarityPets = {
+    Common = {"Noobini Pizzanini", "Fluriflura", "Lirilì Larilà", "Pipi Kiwi", "Pipi Corny", "Svinina Bombardino", "Talpa Di Fero", "Tim Cheese", "Pipi Avocado"},
+    Rare = {"Bandito Bobritto", "Boneca Ambalabu", "Cacto Hipopotamo", "Gangster Footera", "Ta Ta Ta Ta Sahur", "Tric Trac Baraboom", "Trippi Troppi", "Tung Tung Tung Sahur"},
+    Epic = {"Penguino Cocosino", "Salamino Penguino", "Avocadini Guffo","Bambini Crostini","Bananaita Dolphinita","Brr Brr Patapim", "Brri Brri Dicus Bombicus", "Cappuccino Assasino","Perochello Lemonchello","Trulimero Trulicina", "Avocadini Antilopini"},
+    Mythic = {"Carrotini Brainini", "Tracoducotulu Delapeladustuz", "Tob Tobi Tobi", "Ganganzelli Trulala", "Bombardiro Crocodilo", "Bombombini Gusini", "Cavallo Virtuoso", "Frigo Camelo", "Mythic Lucky Block", "Orangutini Ananassini", "Rhino Toasterino", "Spioniro Golubiro", "Tigrilini Watermelini", "Zibra Zubra Zibralini", "Lerulerulerule", "Carloo"},
+    Legendary = {"Quivoli Ameleonni", "Ballerina Cappuccina", "Blueberrinni Octopusini", "Burbaloni Loliloli", "Strawberry Flamingelli","Pipi Potato","Cocosini Mama","Pandaccini Bananini","Pi Pi Watermelon","Sigma Boy", "Chef Crabracadabra", "Chimpanzini Bananini", "Glorbo Fruttodrillo", "Lionel Cactuseli", "Pandaccini Bananini"},
+["Brainrot God"] = {"Gattatino Nyanino", "Cacasito Satalito", "Crabbo Limonetta", "Mastodontico Tellepiedone", "Gattito Tacico", "Chihuanini Taconini", "Los Tipi Tacos", "Tralalero Tralala", "Tralalita tralala", "Bulbito Bandito Traktorito", "Unclito Samito", "Alessio", "Urubini Flamenguini", "Pakrahmatmamat", "Brr es Teh Patipum", "Tartarauga Cisterna", "Ballerino Lololo", "Tipi Topi Taco", "Espresso Signora", "Gattatino Neonino", "Los Orcalitos", "Los Crocodillitos", "Los Bombinitos", "Piccione Macchina", "Tukanno Bananno","Trippy Troppi Troppa Trippa", "Los Tungtungtungcitos", "Brainrot God Lucky Block", "Cocofanto Elefanto", "Girafa Celestre", "Matteo", "Odin Din Din Dun", "Orcalero Orcala", "Statutino Libertino", "Tigroligre Frutooni", "Trenostruzzo Turbo 3000"},
+    Secret = {"Bisonte Giuppitere", "Dul Dul Dul", "Blackhole Goat", "Los Spyderinis", "Ketupat Kepat", "Karkerkar Kurkur", "Los Matteos", "Esok Sekolah", "Los Hotspotsitos", "Garama and Madundung", "Las Vaquitas Saturnitas", "Nuclearo Dinossauro", "Chimpanzini Spiderini", "Graipuss Medussi", "La Grande Combinasion", "La Supreme Combinasion", "Agarrini la Palini","Dragon Cannelloni","Los Combinasionas", "La Vacca Saturno Saturnita", "Las Tralaleritas", "Los Tralaleritos", "Pot Hotspot", "Secret Lucky Block", "Torrtugini Dragonfrutini", "Spaghetti Tualetti", "Los Noo My Hotspotsitos", "Strawberry Elephant"}
+}
+
+-- ===============================
+-- Variablen
+-- ===============================
+local selectedPets = {}
+local autoFarmEnabled = false
+local selectedFarmMode = "Tween"
+
+-- ===============================
+-- Brainrot Dropdown (neues UI)
+-- ===============================
+local allPets = {}
+for _, pets in pairs(RarityPets) do
+    for _, pet in ipairs(pets) do
+        table.insert(allPets, pet)
+    end
+end
+
+local SelectBrainrot = BuyTab:CreateDropdown({
+    Name = "Select Brainrots",
+    Description = "Choose which Brainrots to Auto Purchase",
+    Options = allPets,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Callback = function(options)
+        selectedPets = {}
+        for _, petName in ipairs(options) do
+            selectedPets[petName] = true
+        end
+    end
+}, "BrainrotDropdown")
+
+-- ===============================
+-- Farm Mode Dropdown (Tween / Walk)
+-- ===============================
+local ModeDropdown = BuyTab:CreateDropdown({
+    Name = "Farm Mode",
+    Description = "Select Farm Mode to move to Brainrots",
+    Options = {"Tween", "Walk"},
+    CurrentOption = {"Tween"},
+    MultipleOptions = false,
+    Callback = function(option)
+        selectedFarmMode = option
+    end
+}, "FarmModeDropdown")
+
+-- ===============================
+-- Auto Farm Toggle
+-- ===============================
+local FarmToggle = BuyTab:CreateToggle({
+    Name = "Auto Farm",
+    Description = "Automatically Moves to Selected Brainrot and Purchases them.",
+    CurrentValue = false,
+    Callback = function(value)
+        autoFarmEnabled = value
+    end
+}, "AutoFarmToggle")
+
+-- ===============================
+-- Anti Reset Funktion
+-- ===============================
+local function enableAntiReset()
+    local char = Player.Character or Player.CharacterAdded:Wait()
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.BreakJointsOnDeath = false
+        hum:GetPropertyChangedSignal("Health"):Connect(function()
+            if hum.Health < 101 then
+                hum.Health = 100
+            end
+        end)
+    end
+end
+
+-- ===============================
+-- Farm Loop
+-- ===============================
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        if autoFarmEnabled then
+            local renderedContainer = workspace:FindFirstChild("RenderedMovingAnimals")
+            if renderedContainer then
+                for _, petModel in ipairs(renderedContainer:GetChildren()) do
+                    if petModel:IsA("Model") and selectedPets[petModel.Name] then
+                        local rp = petModel:FindFirstChild("RootPart") or petModel:FindFirstChild("FakeRootPart")
+                        if rp and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+                            local hrp = Player.Character.HumanoidRootPart
+                            local hum = Player.Character:FindFirstChildOfClass("Humanoid")
+                            local dist = (hrp.Position - rp.Position).Magnitude
+
+                            -- Bewegung
+                            if selectedFarmMode == "Tween" then
+                                enableAntiReset()
+                                if currentTween then currentTween:Cancel() end
+                                currentTween = TweenService:Create(
+                                    hrp,
+                                    TweenInfo.new(dist / 35, Enum.EasingStyle.Linear),
+                                    { CFrame = rp.CFrame }
+                                )
+                                currentTween:Play()
+                            elseif hum then
+                                hum:MoveTo(rp.Position)
+                            end
+
+                            -- Kaufen/Steal wenn nah genug dran
+                            if dist <= 8 then
+                                for _, obj in ipairs(workspace:GetDescendants()) do
+                                    if obj:IsA("ProximityPrompt") then
+                                        obj:InputHoldBegin()
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+
+
+BuyTab:CreateSection("Buy Items/Tools")
+
+
+local function buyItem(itemName)
+    local success, err = pcall(function()
+        local args = { itemName }
+        game:GetService("ReplicatedStorage"):WaitForChild("Packages")
+        :WaitForChild("Net")
+        :WaitForChild("RF/CoinsShopService/RequestBuy")
+        :InvokeServer(unpack(args))
+    end)
+
+    if success then  
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "Purchase Successful",
+            Text = "You have purchased: " .. itemName,
+            Icon = "rbxassetid://11157772247", -- Beispiel-Icon (Alert Triangle)
+            Duration = 5
+        })
+    else  
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "Purchase Failed",
+            Text = "Could not purchase: " .. itemName .. "\n" .. tostring(err),
+            Icon = "rbxassetid://5107150301", -- Beispiel-Icon
+            Duration = 5
+        })
+    end
+end
+
+
+
+
+-- Shop-Buttons im BuyTab mit CreateButton
+local Button
+
+
+local Toggle = BuyTab:CreateToggle({
+    Name = "Enable/Disable Inventory",
+    Description = "Useful for sorting and organizing items or tools efficiently.",
+    CurrentValue = false,
+    Callback = function(Value)
+    if Value then
+        game.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+    else
+        game.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+      end
+    end
+}, "Toggle")
+
+
+Button = BuyTab:CreateButton({
+    Name = "Trap",
+    Description = "Buy Trap",
+    Callback = function() buyItem("Trap") end
+})
+
+Button = BuyTab:CreateButton({
+    Name = "Medusa's Head",
+    Description = "Buy Medusa's Head",
+    Callback = function() buyItem("Medusa's Head") end
+})
+
+Button = BuyTab:CreateButton({
+    Name = "Web Slinger",
+    Description = "Buy Web Slinger",
+    Callback = function() buyItem("Web Slinger") end
+})
+
+Button = BuyTab:CreateButton({
+    Name = "Quantum Cloner",
+    Description = "Buy Quantum Cloner",
+    Callback = function() buyItem("Quantum Cloner") end
+})
+
+Button = BuyTab:CreateButton({
+    Name = "All Seeing Sentry",
+    Description = "Buy All Seeing Sentry",
+    Callback = function() buyItem("All Seeing Sentry") end
+})
+
+Button = BuyTab:CreateButton({
+    Name = "Rainbowrath Sword",
+    Description = "Buy Rainbowrath Sword",
+    Callback = function() buyItem("Rainbowrath Sword") end
+})
+
+Button = BuyTab:CreateButton({
+    Name = "Laser Cape",
+    Description = "Buy Laser Cape",
+    Callback = function() buyItem("Laser Cape") end
+})
+
+Button = BuyTab:CreateButton({
+    Name = "Rage Table",
+    Description = "Buy Rage Table",
+    Callback = function() buyItem("Rage Table") end
+})
+
+Button = BuyTab:CreateButton({
+    Name = "Coil Combo",
+    Description = "Buy Coil Combo",
+    Callback = function() buyItem("Coil Combo") end
+})
+
+Button = BuyTab:CreateButton({
+    Name = "Invisibility Cloak",
+    Description = "Buy Invisibility Cloak",
+    Callback = function() buyItem("Invisibility Cloak") end
+})
+
+Button = BuyTab:CreateButton({
+    Name = "Body Swap Potion",
+    Description = "Buy Body Swap Potion",
+    Callback = function() buyItem("Body Swap Potion") end
+})
+
+
+EspTab:CreateSection("Base Color Section")
+
+
+local plotName
+local originalColors = {}
+local selectedStyle = "Normal"
+local rainbowRunning = false
+local rainbowThread
+
+-- Plot finden
+local function findPlot()
+    for _, plot in ipairs(workspace.Plots:GetChildren()) do
+        local base = plot:FindFirstChild("YourBase", true)
+        if base and base.Enabled then
+            return plot.Name
+        end
+    end
+    return nil
+end
+
+-- Originalfarben speichern
+local function saveOriginalColors()
+    if not plotName then return end
+    local plot = workspace.Plots[plotName]
+    for _, obj in ipairs(plot.Decorations:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            originalColors[obj] = {
+                Color = obj.Color,
+                BrickColor = obj.BrickColor,
+                Material = obj.Material,
+                Transparency = obj.Transparency,
+                Reflectance = obj.Reflectance
+            }
+        end
+    end
+end
+
+-- Schwarzfärben wie in deinem Script
+local function setBaseBlack()
+    if not plotName then return end
+    local plot = workspace.Plots[plotName]
+    for _, obj in ipairs(plot.Decorations:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            obj.Color = Color3.new(0, 0, 0)
+            obj.BrickColor = BrickColor.new("Really black")
+        end
+    end
+end
+
+-- Style anwenden
+local function applyStyle(style)
+    if not plotName then return end
+    local plot = workspace.Plots[plotName]
+
+    for _, obj in ipairs(plot.Decorations:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            if style == "Normal" then
+                local data = originalColors[obj]
+                if data then
+                    obj.Color = data.Color
+                    obj.BrickColor = data.BrickColor
+                    obj.Material = data.Material
+                    obj.Transparency = data.Transparency
+                    obj.Reflectance = data.Reflectance
+                end
+            elseif style == "Gold" then
+                obj.Color = Color3.fromRGB(255, 215, 0)
+                obj.Material = Enum.Material.Neon
+                obj.Transparency = 0.2
+                obj.Reflectance = 0.25
+            elseif style == "Diamant" then
+                obj.Color = Color3.fromRGB(0, 191, 255)
+                obj.Material = Enum.Material.Neon
+                obj.Transparency = 0.2
+                obj.Reflectance = 0.25
+            elseif style == "Galaxy" then
+                obj.Color = Color3.fromRGB(75, 0, 130)
+                obj.Material = Enum.Material.ForceField
+                obj.Transparency = 0
+                obj.Reflectance = 0
+            elseif style == "Black" then
+                setBaseBlack()
+            end
+        end
+    end
+end
+
+-- Regenbogen starten
+local function startRainbow()
+    if rainbowRunning then return end
+    rainbowRunning = true
+    rainbowThread = task.spawn(function()
+        local hue = 0
+        while rainbowRunning do
+            hue = (hue + 0.01) % 1
+            if plotName then
+                for _, obj in ipairs(workspace.Plots[plotName].Decorations:GetDescendants()) do
+                    if obj:IsA("BasePart") then
+                        obj.Color = Color3.fromHSV(hue, 1, 1)
+                        obj.Material = Enum.Material.Neon
+                        obj.Transparency = 0.2
+                        obj.Reflectance = 0.25
+                    end
+                end
+            end
+            task.wait(0.05)
+        end
+    end)
+end
+
+-- Regenbogen stoppen
+local function stopRainbow()
+    rainbowRunning = false
+    if rainbowThread then
+        task.cancel(rainbowThread)
+        rainbowThread = nil
+    end
+end
+
+-- Original wiederherstellen
+local function restoreColors()
+    stopRainbow()
+    for obj, data in pairs(originalColors) do
+        if obj and obj.Parent then
+            obj.Color = data.Color
+            obj.BrickColor = data.BrickColor
+            obj.Material = data.Material
+            obj.Transparency = data.Transparency
+            obj.Reflectance = data.Reflectance
+        end
+    end
+end
+
+-- Toggle erstellen
+local Toggle = EspTab:CreateToggle({
+    Name = "Enable Base Skin Changer",
+    Description = "Changes your Base Color",
+    CurrentValue = false,
+    Callback = function(Value)
+        if not plotName then
+            plotName = findPlot()
+        end
+        if Value then
+            if next(originalColors) == nil then
+                saveOriginalColors()
+            end
+            stopRainbow()
+            if selectedStyle == "Rainbow" then
+                startRainbow()
+            else
+                applyStyle(selectedStyle)
+            end
+        else
+            restoreColors()
+        end
+    end
+}, "BaseStyleToggle")
+
+-- Dropdown erstellen
+local Dropdown = EspTab:CreateDropdown({
+    Name = "Color Base Option",
+    Options = {"Normal","Gold","Diamant","Rainbow","Galaxy","Black"},
+    CurrentOption = "Normal",
+    MultipleOptions = false,
+    Callback = function(Option)
+        selectedStyle = Option
+        if Toggle.CurrentValue then
+            stopRainbow()
+            if selectedStyle == "Rainbow" then
+                startRainbow()
+            else
+                applyStyle(selectedStyle)
+            end
+        end
+    end
+}, "BaseStyleDropdown")
+
+
+
+
+EspTab:CreateSection("ESP Section")
+
+
+
+-- 📒 Services & Module
+local plrs = game:GetService("Players")
+local rs = game:GetService("ReplicatedStorage")
+local plr = plrs.LocalPlayer
+
+local plotController = require(rs.Controllers.PlotController)
+local Animals = require(rs.Datas.Animals)
+local sharedAnimals = require(rs.Shared.Animals)
+
+-- 📒 Hilfsfunktionen
+local function splitConcatenatedTable(str, sep)
+    local result = {}
+    for part in string.gmatch(str, "([^" .. sep .. "]+)") do
+        table.insert(result, part)
+    end
+    return result
+end
+
+-- Pareto-Filter: beste Tiere anhand bestimmter Keys finden
+local function getBestByKeys(pets, keys)
+    local bestPets = {}
+    for _, pet in ipairs(pets) do
+        local dominated = false
+        for _, other in ipairs(pets) do
+            if other ~= pet then
+                local betterInAtLeastOne = false
+                local worseInAny = false
+                for _, key in ipairs(keys) do
+                    local a, b = pet[key] or -math.huge, other[key] or -math.huge
+                    if b > a then
+                        worseInAny = true
+                    elseif b < a then
+                        betterInAtLeastOne = true
+                    end
+                end
+                if worseInAny and not betterInAtLeastOne then
+                    dominated = true
+                    break
+                end
+            end
+        end
+        if not dominated then
+            table.insert(bestPets, pet)
+        end
+    end
+    return bestPets
+end
+
+-- 📒 SAB Basis
+local SAB = {}
+
+function SAB.GetPlots()
+    if not _plots then
+        getgenv()._plots = getupvalue(plotController.Start, 2)
+    end
+    return _plots
+end
+
+function SAB.GetPlot(UID)
+    return (UID and SAB.GetPlots()[UID]) or plotController:GetMyPlot()
+end
+
+function SAB.GetPlotAnimals(plot)
+    plot = plot or SAB.GetPlot()
+    local _, b = plot.Channel:Get("AnimalList")
+    return b.AnimalList
+end
+
+function SAB.GetAnimalPrice(animalName)
+    return sharedAnimals:GetPrice(animalName)
+end
+
+function SAB.GetAnimalGeneration(animalName, mutation, traits)
+    return sharedAnimals:GetGeneration(animalName, mutation, traits, nil)
+end
+
+-- 📒 Highlight Modes
+local HighlightModeEnum = {
+    Price = 1,
+    Generation = 2,
+    Both = 3
+}
+
+-- =========================================================
+-- 🔴 Highlight Best Plot Animals
+-- =========================================================
+SAB.HighlightBestPlotAnimals = {
+    lastHighlights = {},
+    lastGuis = {},
+    CHECK_DELAY = 1,
+    highlightMode = HighlightModeEnum.Both,
+    highlightEveryBase = true,
+    excludeOwnBase = true
+}
+
+-- 🚀 Beam-Setup (Grüner Laser vom Charakter zum besten Animal)
+local function createBeam(startPart, endPart)
+    local att0 = Instance.new("Attachment")
+    att0.Parent = startPart
+
+    local att1 = Instance.new("Attachment")
+    att1.Parent = endPart
+
+    local beam = Instance.new("Beam")
+    beam.Attachment0 = att0
+    beam.Attachment1 = att1
+    
+    -- ✅ Farbe: Knalliges Grün mit sanftem Verlauf
+    beam.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 0)), -- Start Grün
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 128)) -- Ende etwas heller
+    })
+
+    -- ✅ Breite: leicht variieren für Glow-Effekt
+    beam.Width0 = 0.25
+    beam.Width1 = 0.25
+
+    -- ✅ Transparenz: Mitte sichtbar, Ränder leicht transparent → Glow
+    beam.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.1),
+        NumberSequenceKeypoint.new(0.5, 0),
+        NumberSequenceKeypoint.new(1, 0.1)
+    })
+
+    -- ✅ Weitere Effekte
+    beam.LightEmission = 5 -- Leuchten
+    beam.LightInfluence = 0 -- unabhängig von Spiel-Licht
+    beam.FaceCamera = true
+    beam.Parent = startPart
+
+    return beam, att0, att1
+end
+
+
+function SAB.HighlightBestPlotAnimals:AddLaserToBestAnimal(model)
+    local hrp = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local targetPart = model:FindFirstChildWhichIsA("BasePart", true)
+    if not targetPart then return end
+    local beam, att0, att1 = createBeam(hrp, targetPart)
+    table.insert(self.lastHighlights, beam)
+    table.insert(self.lastHighlights, att0)
+    table.insert(self.lastHighlights, att1)
+end
+
+function SAB.HighlightBestPlotAnimals:Toggle(boolean, withLaser)
+    if boolean and not self.isRunning then
+        self.enabled = true
+    elseif not boolean and self.enabled then
+        self.enabled = false
+        return
+    end
+    self.isRunning = true
+
+    local function setAnimalGuiHuge(animalGui, bool)
+        if bool then
+            animalGui.AlwaysOnTop = true
+            animalGui.MaxDistance = 9999
+            animalGui.Size = UDim2.fromScale(100, 35)
+            table.insert(self.lastGuis, animalGui)
+        else
+            animalGui.AlwaysOnTop = false
+            animalGui.MaxDistance = 60
+            animalGui.Size = UDim2.fromScale(15, 5)
+        end
+    end
+
+    local function addHighlight(model)
+        local highlight = Instance.new("Highlight")
+        highlight.FillColor = Color3.fromRGB(0, 255, 0)
+        highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
+        highlight.Parent = model
+        table.insert(self.lastHighlights, highlight)
+    end
+
+    local function cleanupEverything()
+        for _, v in pairs(self.lastHighlights) do
+            if v then v:Destroy() end
+        end
+        for _, v in pairs(self.lastGuis) do
+            setAnimalGuiHuge(v, false)
+        end
+        table.clear(self.lastHighlights)
+        table.clear(self.lastGuis)
+    end
+
+    while task.wait(self.CHECK_DELAY) and self.enabled do
+        cleanupEverything()
+        local bestAnimal
+        local maxGeneration = -math.huge
+        for _, plot in pairs(SAB.GetPlots()) do
+            if not (self.excludeOwnBase and plot == SAB.GetPlot()) then
+                local plotAnimals = SAB.GetPlotAnimals(plot)
+                if plotAnimals then
+                    for podiumIndex, animal in pairs(plotAnimals) do
+                        if animal ~= "Empty" and animal.Steal == false then
+                            local value = SAB.GetAnimalGeneration(animal.Index, animal.Mutation, animal.Traits)
+                            if value and value > maxGeneration then
+                                maxGeneration = value
+                                bestAnimal = {plotUID = plot.UID, index = podiumIndex}
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        if bestAnimal then    
+            local s, model = pcall(function()    
+                return workspace.Plots[bestAnimal.plotUID].AnimalPodiums[bestAnimal.index]    
+            end)    
+            if s and model then    
+                local gui = model:FindFirstChild("AnimalOverhead", true)    
+                if gui then setAnimalGuiHuge(gui, true) end    
+                addHighlight(model)    
+
+                -- Falls Laser-Option aktiv → schwarzen Laser anzeigen
+                if withLaser then
+                    SAB.HighlightBestPlotAnimals:AddLaserToBestAnimal(model)
+                end
+            end    
+        end
+    end
+
+    cleanupEverything()
+    self.isRunning = false
+end
+
+
+
+-- ✅ Laser Toggle
+local AnimalLaser = EspTab:CreateToggle({
+    Name = "Neon Line to Best Animal",
+    Description = "",
+    CurrentValue = false,
+    Callback = function(val)
+        SAB.HighlightBestPlotAnimals:Toggle(val, true)
+    end
+}, "AnimalLaser")
+
+
+
+local Animal = EspTab:CreateToggle({
+    Name = "Highlight Best Animal",
+    Description = "",
+    CurrentValue = false,
+    Callback = function(val)
+    SAB.HighlightBestPlotAnimals:Toggle(val)
+    end
+}, "Animal")
+
+
+
+local PlotTimer = EspTab:CreateToggle({
+    Name = "Highlight Plot Timers",
+    Default = false,
+    Description = "",
+    CurrentValue = false,
+    Callback = function(Value)
+    SAB.BigPlotTimers:Toggle(Value)
+    end
+}, "PlotTimer")
+
+
+
+-- Player ESP
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+
+
+local playerESPEnabled = false
+
+
+local ESPFolder = Instance.new("Folder")
+ESPFolder.Name = "PlayerESP"
+ESPFolder.Parent = CoreGui
+
+local function CreatePlayerESP(player)
+    if player == LocalPlayer or ESPFolder:FindFirstChild(player.Name) then return end
+    local character = player.Character
+    if not character or not character:FindFirstChild("Head") then return end
+    local container = Instance.new("Folder")
+    container.Name = player.Name
+    container.Parent = ESPFolder
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = character
+    highlight.FillColor = Color3.fromRGB(255, 255, 0)
+    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+    highlight.FillTransparency = 0.3
+    highlight.OutlineTransparency = 0
+    highlight.Parent = container
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "NameTag"
+    billboard.Adornee = character:FindFirstChild("Head")
+    billboard.Size = UDim2.new(0, 100, 0, 20)
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = container
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 1, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = player.Name
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextScaled = true
+    nameLabel.Parent = billboard
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local box = Instance.new("BoxHandleAdornment")
+            box.Name = "ESP_" .. part.Name
+            box.Adornee = part
+            box.Size = part.Size
+            box.AlwaysOnTop = true
+            box.ZIndex = 0
+            box.Color3 = Color3.fromRGB(255, 0, 0)
+            box.Transparency = 0.2
+            box.Parent = container
+        end
+    end
+end
+
+local function UpdatePlayerESP()
+    if not playerESPEnabled then
+        ESPFolder:ClearAllChildren()
+        return
+    end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            CreatePlayerESP(p)
+        end
+    end
+end
+
+Players.PlayerRemoving:Connect(function(player)
+    local esp = ESPFolder:FindFirstChild(player.Name)
+    if esp then esp:Destroy() end
+end)
+
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function()
+        task.wait(1)
+        if playerESPEnabled then CreatePlayerESP(p) end
+    end)
+end)
+
+RunService.Heartbeat:Connect(UpdatePlayerESP)
+
+
+
+local Player = EspTab:CreateToggle({
+    Name = "Highlight Players",
+    Description = "",
+    CurrentValue = false,
+    Callback = function(state)
+    playerESPEnabled = state
+        if not state then
+            ESPFolder:ClearAllChildren()
+        end
+    end
+}, "Player")
+
+
+
+
+
+
+-- Webhook Management 
+WebTab:CreateSection("Webhook Management")
+
+
+
+--// Services
+local HttpService = game:GetService("HttpService")
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+--// Request function
+local requestFunc = http_request or request or (syn and syn.request) or (fluxus and fluxus.request)
+if not requestFunc then
+    warn("No request function available. Webhook sending won't work.")
+end
+
+--// Config
+local Config = {
+    Webhook = "",
+    DiscordId = 0, -- 0 = no ping, "everyone" = @everyone, or Discord ID as string
+    SendEmbed = false,
+    SendEveryone = false,
+    SelectedMethod = "", -- "Spawned Brainrots" or "Current Server"
+    SelectedPets = {}
+}
+
+local alreadySent = {}
+local currentConn
+
+
+local RarityPets = {
+    Common = {"Noobini Pizzanini", "Fluriflura", "Lirilì Larilà", "Pipi Kiwi", "Pipi Corny", "Svinina Bombardino", "Talpa Di Fero", "Tim Cheese", "Pipi Avocado"},
+    Rare = {"Bandito Bobritto", "Boneca Ambalabu", "Cacto Hipopotamo", "Gangster Footera", "Ta Ta Ta Ta Sahur", "Tric Trac Baraboom", "Trippi Troppi", "Tung Tung Tung Sahur"},
+    Epic = {"Penguino Cocosino", "Salamino Penguino", "Avocadini Guffo","Bambini Crostini","Bananaita Dolphinita","Brr Brr Patapim", "Brri Brri Dicus Bombicus", "Cappuccino Assasino","Perochello Lemonchello","Trulimero Trulicina", "Avocadini Antilopini"},
+    Mythic = {"Carrotini Brainini", "Tracoducotulu Delapeladustuz", "Tob Tobi Tobi", "Ganganzelli Trulala", "Bombardiro Crocodilo", "Bombombini Gusini", "Cavallo Virtuoso", "Frigo Camelo", "Mythic Lucky Block", "Orangutini Ananassini", "Rhino Toasterino", "Spioniro Golubiro", "Tigrilini Watermelini", "Zibra Zubra Zibralini", "Lerulerulerule", "Carloo"},
+    Legendary = {"Quivoli Ameleonni", "Ballerina Cappuccina", "Blueberrinni Octopusini", "Burbaloni Loliloli", "Strawberry Flamingelli","Pipi Potato","Cocosini Mama","Pandaccini Bananini","Pi Pi Watermelon","Sigma Boy", "Chef Crabracadabra", "Chimpanzini Bananini", "Glorbo Fruttodrillo", "Lionel Cactuseli", "Pandaccini Bananini"},
+["Brainrot God"] = {"Gattatino Nyanino", "Cacasito Satalito", "Crabbo Limonetta", "Mastodontico Tellepiedone", "Gattito Tacico", "Chihuanini Taconini", "Los Tipi Tacos", "Tralalero Tralala", "Tralalita tralala", "Bulbito Bandito Traktorito", "Unclito Samito", "Alessio", "Urubini Flamenguini", "Pakrahmatmamat", "Brr es Teh Patipum", "Tartarauga Cisterna", "Ballerino Lololo", "Tipi Topi Taco", "Espresso Signora", "Gattatino Neonino", "Los Orcalitos", "Los Crocodillitos", "Los Bombinitos", "Piccione Macchina", "Tukanno Bananno","Trippy Troppi Troppa Trippa", "Los Tungtungtungcitos", "Brainrot God Lucky Block", "Cocofanto Elefanto", "Girafa Celestre", "Matteo", "Odin Din Din Dun", "Orcalero Orcala", "Statutino Libertino", "Tigroligre Frutooni", "Trenostruzzo Turbo 3000"},
+    Secret = {"Bisonte Giuppitere", "Dul Dul Dul", "Blackhole Goat", "Los Spyderinis", "Ketupat Kepat", "Karkerkar Kurkur", "Los Matteos", "Esok Sekolah", "Los Hotspotsitos", "Garama and Madundung", "Las Vaquitas Saturnitas", "Nuclearo Dinossauro", "Chimpanzini Spiderini", "Graipuss Medussi", "La Grande Combinasion", "La Supreme Combinasion", "Agarrini la Palini","Dragon Cannelloni","Los Combinasionas", "La Vacca Saturno Saturnita", "Las Tralaleritas", "Los Tralaleritos", "Pot Hotspot", "Secret Lucky Block", "Torrtugini Dragonfrutini", "Spaghetti Tualetti", "Los Noo My Hotspotsitos", "Strawberry Elephant"}
+}
+
+--===============================
+-- Flatten all pets for dropdown
+--===============================
+local allPets = {}
+for _, pets in pairs(RarityPets) do
+    for _, pet in ipairs(pets) do
+        table.insert(allPets, pet)
+    end
+end
+
+
+
+--// Helper to send webhook
+local function sendWebhook(name, price, rarity, mutation, mps)
+if Config.Webhook == "" then return end
+
+-- Falls mutation leer oder nil ist, auf "None" setzen
+if not mutation or mutation == "" then
+mutation = "No Mutation"
+end
+
+local content = "✅️ Successfully Sent SAB Notify"
+
+local content
+if Config.SendEveryone then
+content = "@everyone ✅️ Successfully Sent SAB Notify"
+elseif not Config.SendEveryone and Config.SendEmbed then
+content = "✅️ Successfully Sent SAB Notify"
+elseif Config.DiscordId ~= 0  then
+content = "<@" .. tostring(Config.DiscordId) .. ">"
+else
+content = ""
+end
+
+
+local embed = {
+title = "🧠 Brainrot has Spawned | " .. name,
+color = 0xff4080,
+fields = {
+{ name = "🏷️ Name", value = name, inline = true },
+{ name = "🧬 Mutation", value = mutation, inline = true },
+{ name = "📈 Generation", value = mps, inline = true },
+{ name = "🌟 Brainrot Rarity", value = rarity, inline = true }
+},
+footer = { text = "Made by H4x  •  Today at " .. os.date("%I:%M %p") }
+}
+
+local data = {
+content = content,
+embeds = { embed }
+}
+
+requestFunc({
+Url = Config.Webhook,
+Method = "POST",
+Headers = { ["Content-Type"] = "application/json" },
+Body = HttpService:JSONEncode(data)
+})
+
+end
+
+local function sendWebhookMAN(name, price, rarity, mutation, mps)
+if Config.Webhook == "" then return end
+
+-- Falls mutation leer oder nil ist, auf "None" setzen
+if not mutation or mutation == "" then
+mutation = "No Mutation"
+end
+
+local content = "✅️ Successfully Sent SAB Notify"
+
+local content
+if Config.SendEveryone then
+content = "@everyone ✅️ Successfully Sent SAB Notify"
+elseif not Config.SendEveryone and Config.SendEmbed then
+content = "✅️ Successfully Sent SAB Notify"
+elseif Config.DiscordId ~= 0  then
+content = "<@" .. tostring(Config.DiscordId) .. ">"
+else
+content = ""
+end
+
+local joinLink = string.format("https://fern.wtf/joiner?placeId=%d&gameInstanceId=%s", game.PlaceId, game.JobId)
+
+local teleportScript = string.format([[game:GetService("TeleportService"):TeleportToPlaceInstance(%d, "%s", game.Players.LocalPlayer)]], game.PlaceId, game.JobId)
+
+local embed = {
+title = "🧠 Brainrot TargetFound In Server | " .. name,
+color = 0x12a4ff,
+fields = {
+{ name = "🏷️ Name", value = name, inline = true },
+{ name = "🧬 Mutation", value = mutation, inline = true },
+{ name = "📈 Generation", value = mps, inline = true },
+{ name = "🌟 Brainrot Rarity", value = rarity, inline = true },
+{ name = "📱 Join Script", value = "lua\n" .. teleportScript .. "\n", inline = false },
+{ name = "🔗 Join Link", value = "[Click Here](" .. joinLink .. ")", inline = false }
+},
+footer = { text = "Made by H4x  •  Today at " .. os.date("%I:%M %p") }
+}
+
+local data = {
+content = content,
+embeds = { embed }
+}
+
+requestFunc({
+Url = Config.Webhook,
+Method = "POST",
+Headers = { ["Content-Type"] = "application/json" },
+Body = HttpService:JSONEncode(data)
+})
+
+end
+
+
+
+
+-- ===============================
+-- Scan Functions
+-- ===============================
+
+local function scanSpawner()
+local moving = Workspace:FindFirstChild("MovingAnimals")
+if not moving then return end
+for _, model in pairs(moving:GetChildren()) do
+if model:IsA("Model") then
+local nameLabel = model:FindFirstChildWhichIsA("BillboardGui", true)
+if nameLabel and nameLabel:FindFirstChild("DisplayName") then
+local name = nameLabel.DisplayName.Text
+if Config.SelectedPets[name] and not alreadySent[name] then
+alreadySent[name] = true
+
+local rarity = nameLabel:FindFirstChild("Rarity") and nameLabel.Rarity.Text or "Unknown"  
+                  
+                -- Hier Mutation aus dem Model suchen, nicht nur im BillboardGui  
+                local mutationLabel = model:FindFirstChild("Mutation", true)  
+                local mutation = "None"  
+                if mutationLabel and mutationLabel:IsA("TextLabel") and mutationLabel.Text ~= "" then  
+                    mutation = mutationLabel.Text  
+                end  
+
+                local price = nameLabel:FindFirstChild("Price") and nameLabel.Price.Text or "Unknown"  
+                local mps = nameLabel:FindFirstChild("Generation") and nameLabel.Generation.Text or "Unknown"  
+
+                sendWebhook(name, price, rarity, mutation, mps)  
+            end  
+        end  
+    end  
+end
+
+end
+
+local function scanBases()
+local plots = Workspace:FindFirstChild("Plots")
+if not plots then return end
+for _, plot in pairs(plots:GetChildren()) do
+if plot:IsA("Model") then
+if plot:FindFirstChild("AnimalPodiums") then
+for _, podium in pairs(plot.AnimalPodiums:GetChildren()) do
+if podium:IsA("Model") then
+local overhead = podium:FindFirstChildWhichIsA("BillboardGui", true)
+if overhead and overhead:FindFirstChild("DisplayName") then
+local name = overhead.DisplayName.Text
+local uniqueId = plot.Name .. podium.Name
+if Config.SelectedPets[name] and not alreadySent[uniqueId] then
+alreadySent[uniqueId] = true
+
+local rarity = overhead:FindFirstChild("Rarity") and overhead.Rarity.Text or "Unknown"  
+
+                            -- Mutation im Model rekursiv suchen  
+                            local mutationLabel = podium:FindFirstChild("Mutation", true)  
+                            local mutation = "None"  
+                            if mutationLabel and mutationLabel:IsA("TextLabel") and mutationLabel.Text ~= "" then  
+                                mutation = mutationLabel.Text  
+                            end  
+
+                            local price = overhead:FindFirstChild("Price") and overhead.Price.Text or "Unknown"  
+                            local mps = overhead:FindFirstChild("Generation") and overhead.Generation.Text or "Unknown"  
+
+                            sendWebhookMAN(name, price, rarity, mutation, mps)  
+                        end  
+                    end  
+                end  
+            end  
+        end  
+    end  
+end
+
+end
+
+
+local function startScan()
+    if currentConn then currentConn:Disconnect() end
+    alreadySent = {}
+    currentConn = RunService.Heartbeat:Connect(function()
+        if Config.SelectedMethod == "Spawned Brainrots" then
+            scanSpawner()
+        elseif Config.SelectedMethod == "Current Server" then
+            scanBases()
+        end
+    end)
+end
+
+
+-- ===============================
+-- UI Elements (Neue Tab-API)
+-- ===============================
+-- Webhook Input
+local WebhookInput = WebTab:CreateInput({
+    Name = "Webhook URL",
+    Description = "Enter your webhook here",
+    PlaceholderText = "Webhook URL",
+    CurrentValue = Config.Webhook,
+    Callback = function(value)
+        Config.Webhook = value
+    end
+}, "WebhookInput")
+
+
+
+local SelectBrainrot = WebTab:CreateDropdown({
+    Name = "Select Brainrots",
+    Description = "Choose which Brainrots to log",
+    Options = allPets,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Callback = function(values)
+        Config.SelectedPets = {}
+        for _, petName in ipairs(values) do
+            Config.SelectedPets[petName] = true
+        end
+    end
+}, "BrainrotDropdown")
+
+
+-- Method Dropdown
+local MethodDropdown = WebTab:CreateDropdown({
+    Name = "Select Method",
+    Description = "Scan method",
+    Options = {"Spawned Brainrots","Current Server"},
+    CurrentOption = {"Spawned Brainrots"},
+    MultipleOptions = false,
+    Callback = function(option)
+        Config.SelectedMethod = option
+    end
+}, "MethodDropdown")
+
+
+local EmbedToggle = WebTab:CreateToggle({
+    Name = "Send Embed",
+    CurrentValue = Config.SendEmbed,
+    Callback = function(state)
+        Config.SendEmbed = state
+        startScan()
+    end
+}, "EmbedToggle")
+
+
+-- Send @everyone Toggle
+local EveryoneToggle = WebTab:CreateToggle({
+    Name = "Send @everyone",
+    Description = "Ping everyone with webhook",
+    CurrentValue = Config.SendEveryone,
+    Callback = function(val)
+        Config.SendEveryone = val
+    end
+}, "EveryoneToggle")
+
+
+
+-- Server Actions
+
+
+-- Discord Button
+local DiscordButton = ServerTab:CreateButton({
+    Name = "H4x's Hub Discord Server",
+    Description = "Copys Discord Invite Link!",
+    Callback = function()
+        setclipboard("https://discord.gg/h4xscripts")
+        Luna:Notification({
+            Title = "H4x's Hub Scripts",
+            Icon = "notifications_active",
+            ImageSource = "Material",
+            Content = "Link has been Copied!"
+        })
+    end
+})
+
+
+ServerTab:CreateSection("Server Actions")
+
+-- Job ID Input
+local JobIDInput = ServerTab:CreateInput({
+    Name = "Job ID",
+    Description = "Paste Job ID here",
+    PlaceholderText = "Enter Job ID",
+    CurrentValue = "",
+    Numeric = false,
+    MaxCharacters = nil,
+    Enter = false,
+    Callback = function(Value)
+        _G.JobID = Value
+        print("Input changed:", Value)
+    end
+})
+
+-- Teleport to Job ID Button
+local TeleportButton = ServerTab:CreateButton({
+    Name = "Teleport to Job ID",
+    Description = "Teleports you to entered Job ID",
+    Callback = function()
+        local TeleportService = game:GetService("TeleportService")
+        local Players = game:GetService("Players")
+        local player = Players.LocalPlayer
+        local placeId = game.PlaceId
+        TeleportService:TeleportToPlaceInstance(placeId, _G.JobID, player)
+    end
+})
+
+-- Rejoin Current Server Button
+local RejoinButton = ServerTab:CreateButton({
+    Name = "Rejoin Current Server",
+    Description = "Instantly rejoin your current server session",
+    Callback = function()
+        local TeleportService = game:GetService("TeleportService")
+        local Players = game:GetService("Players")
+        local player = Players.LocalPlayer
+        local placeId = game.PlaceId
+        local jobId = game.JobId
+        TeleportService:TeleportToPlaceInstance(placeId, jobId, player)
+    end
+})
+
+-- Copy Current Job ID Button
+local CopyJobIDButton = ServerTab:CreateButton({
+    Name = "Copy Current Job ID",
+    Description = "Copies the current server Job ID to your clipboard",
+    Callback = function()
+        local jobId = game.JobId
+        setclipboard(jobId)
+        Luna:Notification({
+            Title = "Job ID Copied",
+            Icon = "content_copy",
+            ImageSource = "Material",
+            Content = "Current Job ID has been copied to clipboard."
+        })
+    end
+})
+
+
+
+-- load config
+Luna:LoadAutoloadConfig()
+SettingsTab:BuildConfigSection()
