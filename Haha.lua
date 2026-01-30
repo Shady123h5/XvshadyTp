@@ -1,3 +1,7 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local player = Players.LocalPlayer
 
 local connections = {SemiInvisible = {}}
 local isInvisible = false
@@ -6,7 +10,6 @@ local clone, oldRoot, hip, animTrack, connection, characterConnection
 for _, gui in pairs(game.CoreGui:GetChildren()) do
     if gui.Name == "ok" then gui:Destroy() end
 end
-
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ok"
 screenGui.ResetOnSpawn = false
@@ -14,75 +17,64 @@ screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = game.CoreGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 140, 0, 75)
-mainFrame.Position = UDim2.new(0.5, -70, 0.1, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-mainFrame.BackgroundTransparency = 0.15
+mainFrame.Size = UDim2.new(0, 120, 0, 80)
+mainFrame.Position = UDim2.new(0.5, -60, 0.7, -40)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+mainFrame.BackgroundTransparency = 0.1
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
 local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 8)
+mainCorner.CornerRadius = UDim.new(0, 6)
 mainCorner.Parent = mainFrame
 
 local mainStroke = Instance.new("UIStroke")
-mainStroke.Color = Color3.fromRGB(255, 0, 0)
-mainStroke.Thickness = 2
-mainStroke.Transparency = 0.3
+mainStroke.Color = Color3.fromRGB(255, 50, 50)
+mainStroke.Thickness = 1
 mainStroke.Parent = mainFrame
 
-spawn(function()
-    local hue = 0
-    while wait() do
-        hue = (hue + 0.01) % 1
-        mainStroke.Color = Color3.fromHSV(hue, 1, 1)
-    end
-end)
-
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, 0, 0, 24)
+titleLabel.Size = UDim2.new(1, 0, 0, 20)
 titleLabel.Position = UDim2.new(0, 0, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Uchiwa Family"
-titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextSize = 14
-titleLabel.Font = Enum.Font.GothamBold
+titleLabel.Text = "Jack 827"
+titleLabel.TextColor3 = Color3.fromRGB(139, 0, 0)
+titleLabel.TextSize = 12
 titleLabel.Parent = mainFrame
-
-spawn(function()
-    local hue = 0
-    while wait() do
-        hue = (hue + 0.01) % 1
-        titleLabel.TextColor3 = Color3.fromHSV(hue, 0.8, 1)
-    end
-end)
 
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0, 18, 0, 18)
-closeBtn.Position = UDim2.new(1, -20, 0, 3)
-closeBtn.BackgroundColor3 = Color3.fromRGB(40, 10, 10)
+closeBtn.Position = UDim2.new(1, -20, 0, 1)
+closeBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
 closeBtn.BorderSizePixel = 0
-closeBtn.Text = "x"
+closeBtn.Text = "X"
 closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeBtn.TextSize = 14
-closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 10
 closeBtn.Parent = mainFrame
+
+local closeBtnCorner = Instance.new("UICorner")
+closeBtnCorner.CornerRadius = UDim.new(0, 4)
+closeBtnCorner.Parent = closeBtn
+
+local closeBtnStroke = Instance.new("UIStroke")
+closeBtnStroke.Color = Color3.fromRGB(255, 50, 50)
+closeBtnStroke.Thickness = 1
+closeBtnStroke.Parent = closeBtn
 
 closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
 local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(1, -16, 0, 35)
-toggleBtn.Position = UDim2.new(0, 8, 0, 32)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+toggleBtn.Size = UDim2.new(1, -10, 0, 30)
+toggleBtn.Position = UDim2.new(0, 5, 0, 25)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
 toggleBtn.BorderSizePixel = 0
-toggleBtn.Text = "Semi Invisible"
+toggleBtn.Text = "invisible off"
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.TextSize = 12
-toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.Parent = mainFrame
 
 local btnCorner = Instance.new("UICorner")
@@ -90,21 +82,9 @@ btnCorner.CornerRadius = UDim.new(0, 6)
 btnCorner.Parent = toggleBtn
 
 local btnStroke = Instance.new("UIStroke")
-btnStroke.Color = Color3.fromRGB(255, 0, 0)
-btnStroke.Thickness = 2
-btnStroke.Transparency = 0.2
+btnStroke.Color = Color3.fromRGB(255, 50, 50)
+btnStroke.Thickness = 1
 btnStroke.Parent = toggleBtn
-
-spawn(function()
-    local hue = 0
-    while wait() do
-        hue = (hue + 0.01) % 1
-        btnStroke.Color = Color3.fromHSV(hue, 1, 1)
-        if not isInvisible then
-            toggleBtn.TextColor3 = Color3.fromHSV(hue, 0.7, 1)
-        end
-    end
-end)
 
 local function removeFolders()
     local playerName = player.Name
@@ -306,15 +286,16 @@ end
 
 toggleBtn.MouseButton1Click:Connect(function()
     isInvisible = not isInvisible
+    
     if isInvisible then
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        toggleBtn.Text = "ACTIVE"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 30, 30)
+        toggleBtn.Text = "invisible on"
         removeFolders()
         setupGodmode()
         enableInvisibility()
     else
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-        toggleBtn.Text = "Semi Invisible"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
+        toggleBtn.Text = "invisible off"
         disableInvisibility()
         for _, conn in ipairs(connections.SemiInvisible) do
             if conn then conn:Disconnect() end
